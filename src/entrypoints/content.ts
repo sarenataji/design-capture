@@ -65,8 +65,13 @@ export default defineContentScript({
       if (message?.type === "start-picker") picker.start();
       if (message?.type === "stop-picker") picker.stop();
       if (message?.type === "scan-page") {
-        const scan = scanPage();
-        void browser.runtime.sendMessage({ type: "save-scan", payload: scan });
+        void (async () => {
+          const globals = (await browser.runtime
+            .sendMessage({ type: "probe-globals" })
+            .catch(() => [])) as { name: string; kind: string }[];
+          const result = scanPage(Array.isArray(globals) ? globals : []);
+          void browser.runtime.sendMessage({ type: "save-scan", payload: result });
+        })();
       }
     });
   },

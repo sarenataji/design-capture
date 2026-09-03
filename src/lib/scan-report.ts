@@ -1,16 +1,28 @@
-import type { PageScan } from "./types";
+import { KIND_LABEL, KIND_ORDER } from "./detect";
+import type { DetectedKind, PageScan } from "./types";
 
-function detectedLine(scan: PageScan): string {
-  if (!scan.detected.length) return "Detected: (none from scripts, DOM, or CSS)";
-  return `Detected: ${scan.detected.map((item) => item.name).join(", ")}`;
+export function stackByKind(scan: PageScan): { kind: DetectedKind; label: string; names: string[] }[] {
+  const groups = new Map<DetectedKind, string[]>();
+  for (const item of scan.detected) {
+    const list = groups.get(item.kind) ?? [];
+    if (!list.includes(item.name)) list.push(item.name);
+    groups.set(item.kind, list);
+  }
+  return KIND_ORDER.filter((kind) => groups.has(kind)).map((kind) => ({
+    kind,
+    label: KIND_LABEL[kind],
+    names: groups.get(kind) ?? [],
+  }));
 }
 
-function motionLine(scan: PageScan): string {
-  const motion = scan.detected.filter(
-    (item) => item.kind === "motion" || item.kind === "3d",
-  );
-  if (!motion.length) return "";
-  return `Motion / 3D: ${motion.map((item) => item.name).join(", ")}`;
+function stackMarkdown(scan: PageScan): string {
+  const groups = stackByKind(scan);
+  if (!groups.length) {
+    return "Detected: (none from scripts, DOM, CSS, or page globals)";
+  }
+  return groups
+    .map((group) => `- **${group.label}:** ${group.names.join(", ")}`)
+    .join("\n");
 }
 
 export function toScanMd(scan: PageScan): string {
@@ -30,7 +42,7 @@ export function toScanMd(scan: PageScan): string {
 
   return [
     `# Site scan
-Measured from the live page. Detected — not inferred from Figma or marketing.`,
+Measured from the live page. Stack is **detected** (scripts, DOM, CSS, loaded URLs, page globals) — not inferred from Figma.`,
     `## Source
 ${scan.title}
 ${scan.url}
@@ -48,8 +60,7 @@ ${scan.radii.map((s) => `- ${s}`).join("\n") || "- none"}`,
       : "",
     vars ? `## :root\n${vars}` : "",
     `## Stack
-${detectedLine(scan)}
-${motionLine(scan)}`.trim(),
+${stackMarkdown(scan)}`,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -75,5 +86,6 @@ Spacing: ${scan.spacing.join(" | ") || "none"}
 Radii: ${scan.radii.join(" | ") || "none"}
 Shadows: ${scan.shadows.slice(0, 3).join(" | ") || "none"}
 
-${detectedLine(scan)}`;
+Stack:
+${stackMarkdown(scan)}`;
 }

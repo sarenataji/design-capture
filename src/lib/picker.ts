@@ -34,6 +34,7 @@ function frames(n: number): Promise<void> {
 
 export function createPicker(options: PickerOptions) {
   let active = false;
+  let locked = false;
   let current: Element | null = null;
   let host: HTMLElement | null = null;
   let shadow: ShadowRoot | null = null;
@@ -58,10 +59,16 @@ export function createPicker(options: PickerOptions) {
         .overlay.shield { pointer-events: auto; }
         .box {
           position: absolute;
-          border: 1.5px solid #d6ff3f;
-          background: rgba(214, 255, 63, 0.08);
+          border: 1.5px solid #ffb8d4;
+          background: rgba(255, 184, 212, 0.08);
           box-shadow: 0 0 0 1px rgba(10,11,9,0.55);
         }
+        .box.locked {
+          border-style: dashed;
+          background: rgba(255, 184, 212, 0.16);
+        }
+        .tip.locked { box-shadow: 0 0 0 1.5px #ffb8d4, 0 12px 32px rgba(0,0,0,0.45); }
+        .tip .lock { margin-top: 6px; color: #ffb8d4; letter-spacing: 0.08em; }
         .tip {
           position: absolute;
           max-width: 360px;
@@ -71,7 +78,7 @@ export function createPicker(options: PickerOptions) {
           font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
           box-shadow: 0 12px 32px rgba(0,0,0,0.45);
         }
-        .tip b { color: #d6ff3f; font-weight: 650; }
+        .tip b { color: #ffb8d4; font-weight: 650; }
         .tip .sel { color: #9aa392; word-break: break-all; margin-top: 4px; }
         .swatches { display: flex; gap: 4px; margin-top: 6px; }
         .swatch {
@@ -101,7 +108,7 @@ export function createPicker(options: PickerOptions) {
           border-right: 1px solid #2a2e24;
         }
         .brand b { font-size: 10px; letter-spacing: 0.16em; }
-        .brand span { font-size: 9px; color: #d6ff3f; letter-spacing: 0.14em; }
+        .brand span { font-size: 9px; color: #ffb8d4; letter-spacing: 0.14em; }
         .dock button {
           height: 28px;
           padding: 0 9px;
@@ -112,9 +119,9 @@ export function createPicker(options: PickerOptions) {
           font: inherit;
         }
         .dock button.primary {
-          background: #d6ff3f;
+          background: #ffb8d4;
           color: #11140c;
-          border-color: #d6ff3f;
+          border-color: #ffb8d4;
           font-weight: 650;
         }
         .dock kbd {
@@ -127,7 +134,7 @@ export function createPicker(options: PickerOptions) {
           top: 18px;
           left: 50%;
           transform: translateX(-50%);
-          background: #d6ff3f;
+          background: #ffb8d4;
           color: #11140c;
           padding: 8px 12px;
           font: 650 11px/1 ui-sans-serif, system-ui, sans-serif;
@@ -179,6 +186,8 @@ export function createPicker(options: PickerOptions) {
     if (!current || !box || !tip) return;
     const rect = current.getBoundingClientRect();
     box.hidden = false;
+    box.classList.toggle("locked", locked);
+    tip.classList.toggle("locked", locked);
     Object.assign(box.style, {
       left: `${rect.left}px`,
       top: `${rect.top}px`,
@@ -189,15 +198,6 @@ export function createPicker(options: PickerOptions) {
     liveStyles = readStyles(current);
     const preview = hoverPreview(current);
     tip.hidden = false;
-    const tipWidth = 340;
-    const left = Math.min(
-      Math.max(8, rect.left),
-      window.innerWidth - tipWidth - 8,
-    );
-    const preferAbove = rect.top > 120;
-    const top = preferAbove ? rect.top - 8 : rect.bottom + 8;
-    tip.style.left = `${left}px`;
-    tip.style.top = preferAbove ? `${Math.max(8, top - 108)}px` : `${top}px`;
     tip.innerHTML = `
       <b>${escapeHtml(preview.tag)}</b> ${preview.width}×${preview.height}
       <br>${escapeHtml(preview.fontFamily)} · ${escapeHtml(preview.fontWeight)} · ${escapeHtml(preview.fontSize)} / ${escapeHtml(preview.lineHeight)} · ls ${escapeHtml(preview.letterSpacing)}
@@ -208,7 +208,19 @@ export function createPicker(options: PickerOptions) {
         <span class="swatch" style="background:${preview.color}"></span>
         <span class="swatch" style="background:${preview.background}"></span>
       </div>
+      ${locked ? `<div class="lock">LOCKED · ↵ capture · click to release</div>` : ""}
     `;
+
+    const tipWidth = 340;
+    const left = Math.min(
+      Math.max(8, rect.left),
+      window.innerWidth - tipWidth - 8,
+    );
+    const preferAbove = rect.top > tip.offsetHeight + 16;
+    tip.style.left = `${left}px`;
+    tip.style.top = preferAbove
+      ? `${rect.top - tip.offsetHeight - 8}px`
+      : `${Math.min(rect.bottom + 8, window.innerHeight - tip.offsetHeight - 8)}px`;
   }
 
   function setCurrent(el: Element | null) {
@@ -226,7 +238,7 @@ export function createPicker(options: PickerOptions) {
   }
 
   function onMove(event: MouseEvent) {
-    if (!active) return;
+    if (!active || locked) return;
     if (event.composedPath().some((n) => isOurNode(n))) return;
     const el = deepFromPoint(event.clientX, event.clientY);
     if (el) setCurrent(el);
@@ -239,15 +251,30 @@ export function createPicker(options: PickerOptions) {
     event.stopPropagation();
     event.stopImmediatePropagation();
     if (event.type !== "pointerdown") return;
+    if (locked) {
+      setLocked(false);
+      const el = deepFromPoint(event.clientX, event.clientY);
+      if (el) setCurrent(el);
+      return;
+    }
     const el = current || deepFromPoint(event.clientX, event.clientY);
-    if (el) void commit(el);
+    if (!el) return;
+    current = el;
+    setLocked(true);
+  }
+
+  function setLocked(next: boolean) {
+    locked = next;
+    paint();
+    if (next) toast("Locked — ↵ capture, click to release");
   }
 
   function onKey(event: KeyboardEvent) {
     if (!active) return;
     if (event.key === "Escape") {
       event.preventDefault();
-      stop();
+      if (locked) setLocked(false);
+      else stop();
       return;
     }
     if (event.key === "ArrowUp") {
@@ -304,12 +331,13 @@ export function createPicker(options: PickerOptions) {
     document.addEventListener("pointerdown", onPointer, true);
     document.addEventListener("click", onPointer, true);
     document.addEventListener("keydown", onKey, true);
-    toast("Hover — inspect. Click — capture.");
+    toast("Hover — inspect. Click — lock specs.");
   }
 
   function stop() {
     if (!active && !host) return;
     setActive(false);
+    locked = false;
     document.removeEventListener("mousemove", onMove, true);
     document.removeEventListener("pointerdown", onPointer, true);
     document.removeEventListener("click", onPointer, true);

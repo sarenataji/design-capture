@@ -1,3 +1,4 @@
+import { probePageGlobals } from "../lib/probe-globals";
 import { STORAGE_KEYS } from "../lib/storage";
 
 export default defineBackground(() => {
@@ -21,7 +22,7 @@ export default defineBackground(() => {
     await openAndToggle(tab.id);
   });
 
-  browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message?.type === "save-capture") {
       void browser.storage.local.set({
         [STORAGE_KEYS.lastCapture]: message.payload,
@@ -36,6 +37,24 @@ export default defineBackground(() => {
         [STORAGE_KEYS.lastScanAt]: Date.now(),
       });
       sendResponse({ ok: true });
+    }
+    if (message?.type === "probe-globals") {
+      const tabId = sender.tab?.id;
+      if (!tabId) {
+        sendResponse([]);
+        return false;
+      }
+      void chrome.scripting
+        .executeScript({
+          target: { tabId },
+          world: "MAIN",
+          func: probePageGlobals,
+        })
+        .then((results) => {
+          sendResponse(results[0]?.result ?? []);
+        })
+        .catch(() => sendResponse([]));
+      return true;
     }
     return false;
   });

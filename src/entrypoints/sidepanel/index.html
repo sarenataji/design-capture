@@ -20,7 +20,34 @@
     </header>
 
     <section class="jobs" aria-label="Job">
-      <span>Job</span>
+      <div class="field-head">
+        <span>Job</span>
+        <button
+          type="button"
+          id="job-help"
+          class="help"
+          aria-label="What do these jobs mean?"
+          aria-expanded="false"
+          aria-controls="job-guide"
+        >
+          ?
+        </button>
+
+        <div id="job-guide" class="guide" role="dialog" aria-label="Jobs explained" hidden>
+          <div class="guide-head">
+            <strong>What is a job?</strong>
+            <button type="button" id="job-guide-close" class="guide-x" aria-label="Close">
+              ×
+            </button>
+          </div>
+          <p class="guide-lede">
+            It tells the AI what to do with the design you capture.
+          </p>
+          <div id="job-guide-list" class="guide-list"></div>
+          <p class="guide-foot">Tap one to use it. You can change it any time.</p>
+        </div>
+      </div>
+
       <div id="jobs" class="job-row">
         <button type="button" data-job="rebuild" class="on">Rebuild</button>
         <button type="button" data-job="restyle">Restyle</button>
@@ -60,7 +87,7 @@
       <div id="scan-colors" class="scan-colors"></div>
       <p id="scan-type" class="scan-line"></p>
       <p id="scan-space" class="scan-line"></p>
-      <p id="scan-detected" class="scan-line"></p>
+      <div id="scan-stack" class="scan-stack"></div>
       <p id="scan-vars" class="scan-line" hidden></p>
     </section>
 

@@ -1,13 +1,7 @@
 import { colorDistance, cssColorToHex, hexChroma } from "./color";
 import { isEmptyValue } from "./css";
-import type {
-  ColorRole,
-  DetectedKind,
-  DetectedLib,
-  PageScan,
-  ScanColor,
-  ScanTypeface,
-} from "./types";
+import { detectStack } from "./detect";
+import type { ColorRole, PageScan, ScanColor, ScanTypeface } from "./types";
 
 const SKIP_TAGS = new Set([
   "SCRIPT",
@@ -41,356 +35,6 @@ const GENERIC_FONTS = new Set([
   "unset",
 ]);
 
-type Fingerprint = {
-  name: string;
-  kind: DetectedKind;
-  scripts?: RegExp;
-  html?: (ctx: ScanCtx) => boolean;
-};
-
-type ScanCtx = {
-  srcs: string;
-  html: string;
-  classes: string;
-};
-
-const FINGERPRINTS: Fingerprint[] = [
-  {
-    name: "Next.js",
-    kind: "framework",
-    scripts: /\/_next\//,
-    html: () =>
-      Boolean(
-        document.getElementById("__NEXT_DATA__") ||
-          document.getElementById("__next"),
-      ),
-  },
-  {
-    name: "Nuxt",
-    kind: "framework",
-    scripts: /\/_nuxt\//,
-    html: () =>
-      Boolean(
-        document.getElementById("__NUXT_DATA__") ||
-          document.getElementById("__nuxt"),
-      ),
-  },
-  {
-    name: "Gatsby",
-    kind: "framework",
-    scripts: /gatsby/i,
-    html: () => Boolean(document.getElementById("___gatsby")),
-  },
-  {
-    name: "Remix",
-    kind: "framework",
-    scripts: /remix/i,
-    html: () => Boolean(document.querySelector("[data-remix-run]")),
-  },
-  {
-    name: "Astro",
-    kind: "framework",
-    scripts: /astro/i,
-    html: () => Boolean(document.querySelector("astro-island, [data-astro-cid]")),
-  },
-  {
-    name: "SvelteKit",
-    kind: "framework",
-    scripts: /sveltekit|_app\/immutable/i,
-  },
-  {
-    name: "React",
-    kind: "framework",
-    scripts: /react(-dom)?[./-]/i,
-    html: () =>
-      Boolean(
-        document.querySelector("[data-reactroot], [data-reactid]") ||
-          hasReactFiber(),
-      ),
-  },
-  {
-    name: "Vue",
-    kind: "framework",
-    scripts: /vue([.@/]|runtime)/i,
-    html: () => hasPrefixedAttr("data-v-"),
-  },
-  {
-    name: "Angular",
-    kind: "framework",
-    scripts: /angular/i,
-    html: () => Boolean(document.querySelector("[ng-version]")),
-  },
-  {
-    name: "Svelte",
-    kind: "framework",
-    scripts: /svelte/i,
-    html: (ctx) => /\bsvelte-/.test(ctx.classes),
-  },
-  {
-    name: "Solid",
-    kind: "framework",
-    scripts: /solid-js|solidjs/i,
-  },
-  {
-    name: "Qwik",
-    kind: "framework",
-    scripts: /qwik/i,
-    html: () =>
-      Boolean(document.querySelector("script[type='qwik/json']")) ||
-      hasPrefixedAttr("q:"),
-  },
-  {
-    name: "HTMX",
-    kind: "framework",
-    scripts: /htmx/i,
-    html: () => Boolean(document.querySelector("[hx-get], [hx-post], [hx-boost]")),
-  },
-  {
-    name: "Alpine.js",
-    kind: "framework",
-    scripts: /alpine/i,
-    html: () => Boolean(document.querySelector("[x-data]")),
-  },
-  {
-    name: "Tailwind",
-    kind: "styling",
-    scripts: /tailwindcss|cdn\.tailwindcss/i,
-    html: () => hasTailwind(),
-  },
-  {
-    name: "Bootstrap",
-    kind: "styling",
-    scripts: /bootstrap/i,
-    html: (ctx) => /\b(container-fluid|col-md-|navbar-)/.test(ctx.classes),
-  },
-  {
-    name: "GSAP",
-    kind: "motion",
-    scripts: /gsap|ScrollTrigger|SplitText/i,
-  },
-  {
-    name: "Lenis",
-    kind: "motion",
-    scripts: /lenis/i,
-    html: (ctx) => /\blenis\b/.test(ctx.classes),
-  },
-  {
-    name: "Locomotive",
-    kind: "motion",
-    scripts: /locomotive/i,
-    html: (ctx) => /locomotive|c-scrollbar/.test(ctx.classes),
-  },
-  {
-    name: "Barba",
-    kind: "motion",
-    scripts: /barba/i,
-    html: () => Boolean(document.querySelector("[data-barba]")),
-  },
-  {
-    name: "Anime.js",
-    kind: "motion",
-    scripts: /anime(\.min)?\.js|animejs/i,
-  },
-  {
-    name: "Motion",
-    kind: "motion",
-    scripts: /framer-motion|motion-dom|motion\.js/i,
-  },
-  {
-    name: "Lottie",
-    kind: "motion",
-    scripts: /lottie|dotlottie/i,
-    html: () =>
-      Boolean(document.querySelector("lottie-player, dotlottie-player")),
-  },
-  {
-    name: "Three.js",
-    kind: "3d",
-    scripts: /three(\.module|\.min)?\.js|unpkg\.com\/three|cdn.*\/three/i,
-  },
-  {
-    name: "Spline",
-    kind: "3d",
-    scripts: /splinetool|spline-viewer/i,
-    html: () => Boolean(document.querySelector("spline-viewer")),
-  },
-  {
-    name: "Rive",
-    kind: "3d",
-    scripts: /rive/i,
-    html: () => Boolean(document.querySelector("canvas[data-rive], rive-canvas")),
-  },
-  {
-    name: "PixiJS",
-    kind: "3d",
-    scripts: /pixi(\.min)?\.js|pixi\.js/i,
-  },
-  {
-    name: "Webflow",
-    kind: "cms",
-    scripts: /webflow/i,
-    html: (ctx) => /\bw-nav\b|\bw-button\b|\bwebflow\b/.test(ctx.classes),
-  },
-  {
-    name: "Framer",
-    kind: "cms",
-    scripts: /framerusercontent|framer\.com\/m/i,
-    html: () =>
-      Boolean(document.querySelector("[data-framer-name], #__framer")),
-  },
-  {
-    name: "Shopify",
-    kind: "cms",
-    scripts: /cdn\.shopify|shopify/i,
-    html: () => Boolean(document.querySelector("[data-shopify], script#__st")),
-  },
-  {
-    name: "WordPress",
-    kind: "cms",
-    scripts: /wp-content|wp-includes/i,
-  },
-  {
-    name: "Squarespace",
-    kind: "cms",
-    scripts: /squarespace/i,
-  },
-  {
-    name: "Wix",
-    kind: "cms",
-    scripts: /static\.wixstatic|wix\.com/i,
-  },
-  {
-    name: "jQuery",
-    kind: "framework",
-    scripts: /jquery[.-]/i,
-  },
-  {
-    name: "Emotion",
-    kind: "styling",
-    html: () => Boolean(document.querySelector("[data-emotion]")),
-  },
-  {
-    name: "styled-components",
-    kind: "styling",
-    html: () => Boolean(document.querySelector("style[data-styled]")),
-  },
-];
-
-function hasPrefixedAttr(prefix: string): boolean {
-  const sample = Array.from(document.body?.querySelectorAll("*") ?? []).slice(
-    0,
-    80,
-  );
-  return sample.some((el) =>
-    Array.from(el.attributes).some((attr) => attr.name.startsWith(prefix)),
-  );
-}
-
-function hasReactFiber(): boolean {
-  const el =
-    document.querySelector("#__next, #root, #app, [data-reactroot]") ??
-    document.body?.firstElementChild;
-  if (!el) return false;
-  return Object.keys(el).some(
-    (key) =>
-      key.startsWith("__reactFiber") ||
-      key.startsWith("__reactInternalInstance") ||
-      key.startsWith("_reactRootContainer"),
-  );
-}
-
-function hasTailwind(): boolean {
-  const root = getComputedStyle(document.documentElement);
-  if (
-    root.getPropertyValue("--tw-ring-offset-shadow") ||
-    root.getPropertyValue("--tw-translate-x") ||
-    root.getPropertyValue("--tw-bg-opacity")
-  ) {
-    return true;
-  }
-  const sample = Array.from(document.querySelectorAll("[class]")).slice(0, 80);
-  let hits = 0;
-  const util =
-    /\b(flex|grid|hidden|items-center|justify-between|text-(xs|sm|base|lg|xl)|p-\d|px-\d|gap-\d|rounded(-[a-z0-9]+)?)\b/;
-  const variant = /^(sm|md|lg|xl|2xl|hover|focus|dark):/;
-  for (const el of sample) {
-    for (const cls of el.classList) {
-      if (variant.test(cls) || util.test(cls)) hits += 1;
-    }
-  }
-  return hits >= 8;
-}
-
-function isOurRoot(el: Element): boolean {
-  return (
-    el.id === "design-capture-root" ||
-    el.closest?.("[data-design-capture]") !== null
-  );
-}
-
-function walkVisible(limit = 800): Element[] {
-  const out: Element[] = [];
-  if (!document.body) return out;
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
-  let node = walker.nextNode();
-  while (node && out.length < limit) {
-    const el = node as Element;
-    if (!SKIP_TAGS.has(el.tagName) && !isOurRoot(el)) {
-      const rect = el.getBoundingClientRect();
-      if (rect.width > 2 && rect.height > 2) out.push(el);
-    }
-    node = walker.nextNode();
-  }
-  return out;
-}
-
-function collectSources(): ScanCtx {
-  const urls: string[] = [];
-  for (const el of Array.from(document.querySelectorAll("script[src], link[href]"))) {
-    const url =
-      (el instanceof HTMLScriptElement && el.src) ||
-      (el instanceof HTMLLinkElement && el.href) ||
-      "";
-    if (url) urls.push(url);
-  }
-  const classes: string[] = [];
-  for (const el of Array.from(document.querySelectorAll("[class]")).slice(0, 120)) {
-    if (typeof el.className === "string") classes.push(el.className);
-  }
-  return {
-    srcs: urls.join(" "),
-    html: `${document.documentElement.outerHTML.slice(0, 12000)}`,
-    classes: classes.join(" "),
-  };
-}
-
-function detectStack(): DetectedLib[] {
-  const ctx = collectSources();
-  const found: DetectedLib[] = [];
-  for (const fp of FINGERPRINTS) {
-    let via: DetectedLib["via"] | null = null;
-    if (fp.scripts && fp.scripts.test(ctx.srcs)) via = "script";
-    if (!via && fp.html?.(ctx)) {
-      via = fp.scripts && fp.scripts.test(ctx.html) ? "script" : "dom";
-    }
-    if (!via) continue;
-    found.push({ name: fp.name, kind: fp.kind, via });
-  }
-
-  const has3dLib = found.some((item) => item.kind === "3d");
-  const hasGlHint = /webgl|three|spline|rive|pixi/i.test(
-    `${ctx.srcs} ${ctx.classes}`,
-  );
-  if (
-    !has3dLib &&
-    hasGlHint &&
-    document.querySelector("canvas")
-  ) {
-    found.push({ name: "WebGL", kind: "3d", via: "dom" });
-  }
-
-  return found;
-}
 
 type ColorHit = {
   value: string;
@@ -502,7 +146,32 @@ function collectCssVariables(): { name: string; value: string }[] {
     .slice(0, 8);
 }
 
-export function scanPage(): PageScan {
+function isOurRoot(el: Element): boolean {
+  return (
+    el.id === "design-capture-root" ||
+    el.closest?.("[data-design-capture]") !== null
+  );
+}
+
+function walkVisible(limit = 800): Element[] {
+  const out: Element[] = [];
+  if (!document.body) return out;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+  let node = walker.nextNode();
+  while (node && out.length < limit) {
+    const el = node as Element;
+    if (!SKIP_TAGS.has(el.tagName) && !isOurRoot(el)) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 2 && rect.height > 2) out.push(el);
+    }
+    node = walker.nextNode();
+  }
+  return out;
+}
+
+export function scanPage(
+  globals: { name: string; kind: string }[] = [],
+): PageScan {
   const elements = walkVisible();
   const colors = new Map<string, ColorHit>();
   const fonts = new Map<
@@ -626,6 +295,6 @@ export function scanPage(): PageScan {
     radii: ladder(radii, 2, 8),
     shadows: shadowLadder,
     cssVariables: collectCssVariables(),
-    detected: detectStack(),
+    detected: detectStack(globals),
   };
 }

@@ -101,12 +101,35 @@ export type ScanTypeface = {
   sizes: string[];
 };
 
-export type DetectedKind = "framework" | "styling" | "motion" | "3d" | "cms";
+export type DetectedKind =
+  | "framework"
+  | "ui"
+  | "styling"
+  | "motion"
+  | "3d"
+  | "cms"
+  | "analytics"
+  | "media"
+  | "maps"
+  | "fonts"
+  | "bundler"
+  | "hosting"
+  | "payments"
+  | "auth";
+
+export type DetectedVia =
+  | "script"
+  | "dom"
+  | "css"
+  | "class"
+  | "global"
+  | "url"
+  | "meta";
 
 export type DetectedLib = {
   name: string;
   kind: DetectedKind;
-  via: "script" | "dom" | "css" | "class";
+  via: DetectedVia;
 };
 
 export type PageScan = {

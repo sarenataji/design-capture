@@ -1,5 +1,6 @@
+import { JOBS } from "../../lib/jobs";
 import { renderOutput } from "../../lib/prompt";
-import { toScanMd } from "../../lib/scan-report";
+import { stackByKind, toScanMd } from "../../lib/scan-report";
 import { STORAGE_KEYS } from "../../lib/storage";
 import type {
   CaptureResult,
@@ -13,6 +14,11 @@ const out = document.querySelector<HTMLPreElement>("#out")!;
 const intent = document.querySelector<HTMLTextAreaElement>("#intent")!;
 const target = document.querySelector<HTMLSelectElement>("#target")!;
 const jobs = document.querySelector<HTMLElement>("#jobs")!;
+const jobHelp = document.querySelector<HTMLButtonElement>("#job-help")!;
+const jobGuide = document.querySelector<HTMLElement>("#job-guide")!;
+const jobGuideList = document.querySelector<HTMLElement>("#job-guide-list")!;
+const jobGuideClose =
+  document.querySelector<HTMLButtonElement>("#job-guide-close")!;
 const pick = document.querySelector<HTMLButtonElement>("#pick")!;
 const scanBtn = document.querySelector<HTMLButtonElement>("#scan")!;
 const copy = document.querySelector<HTMLButtonElement>("#copy")!;
@@ -27,7 +33,7 @@ const scanReport = document.querySelector<HTMLElement>("#scan-report")!;
 const scanColors = document.querySelector<HTMLElement>("#scan-colors")!;
 const scanType = document.querySelector<HTMLElement>("#scan-type")!;
 const scanSpace = document.querySelector<HTMLElement>("#scan-space")!;
-const scanDetected = document.querySelector<HTMLElement>("#scan-detected")!;
+const scanStack = document.querySelector<HTMLElement>("#scan-stack")!;
 const scanVars = document.querySelector<HTMLElement>("#scan-vars")!;
 
 let kind: OutputKind = "photocopy";
@@ -35,6 +41,14 @@ let job: Job = "rebuild";
 let capture: CaptureResult | null = null;
 let scan: PageScan | null = null;
 let picking = false;
+
+jobGuideList.innerHTML = JOBS.map(
+  (item) =>
+    `<button type="button" data-job="${item.id}">
+      <strong>${item.label}</strong>
+      <small>${item.plain}</small>
+    </button>`,
+).join("");
 
 async function restore() {
   const stored = await browser.storage.local.get([
@@ -67,9 +81,31 @@ function syncTabs() {
 }
 
 function syncJobs() {
-  for (const child of jobs.querySelectorAll("button")) {
+  const buttons = [
+    ...jobs.querySelectorAll("button"),
+    ...jobGuideList.querySelectorAll("button"),
+  ];
+  for (const child of buttons) {
     child.classList.toggle("on", child.dataset.job === job);
   }
+}
+
+function setJob(next: Job) {
+  job = next;
+  void browser.storage.local.set({
+    [STORAGE_KEYS.job]: job,
+    [STORAGE_KEYS.direction]: job,
+  });
+  syncJobs();
+  render();
+}
+
+function setGuide(open: boolean) {
+  jobGuide.hidden = !open;
+  jobHelp.classList.toggle("on", open);
+  jobHelp.setAttribute("aria-expanded", String(open));
+  if (open) jobGuideList.querySelector<HTMLButtonElement>("button")?.focus();
+  else jobHelp.focus();
 }
 
 function setPicking(on: boolean) {
@@ -127,9 +163,15 @@ function renderScan() {
     scan.radii.length ? `Radius ${scan.radii.join(" ")}` : "",
   ].filter(Boolean);
   scanSpace.textContent = tokens.join("  ·  ");
-  scanDetected.textContent = scan.detected.length
-    ? `Detected: ${scan.detected.map((d) => d.name).join(", ")}`
-    : "Detected: (none)";
+  const groups = stackByKind(scan);
+  scanStack.innerHTML = groups.length
+    ? groups
+        .map(
+          (group) =>
+            `<div class="stack-row"><span>${group.label}</span><p>${group.names.join(", ")}</p></div>`,
+        )
+        .join("")
+    : `<div class="stack-row"><span>Stack</span><p>None detected from scripts, DOM, CSS, or globals</p></div>`;
   if (scan.cssVariables.length) {
     scanVars.hidden = false;
     scanVars.textContent = scan.cssVariables
@@ -245,13 +287,29 @@ target.addEventListener("change", () => {
 jobs.addEventListener("click", (event) => {
   const button = (event.target as HTMLElement).closest("button");
   if (!button?.dataset.job) return;
-  job = button.dataset.job as Job;
-  void browser.storage.local.set({
-    [STORAGE_KEYS.job]: job,
-    [STORAGE_KEYS.direction]: job,
-  });
-  syncJobs();
-  render();
+  setJob(button.dataset.job as Job);
+});
+
+jobGuideList.addEventListener("click", (event) => {
+  const button = (event.target as HTMLElement).closest("button");
+  if (!button?.dataset.job) return;
+  setJob(button.dataset.job as Job);
+  setGuide(false);
+});
+
+jobHelp.addEventListener("click", () => setGuide(jobGuide.hidden));
+
+jobGuideClose.addEventListener("click", () => setGuide(false));
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !jobGuide.hidden) setGuide(false);
+});
+
+document.addEventListener("click", (event) => {
+  if (jobGuide.hidden) return;
+  const el = event.target as HTMLElement;
+  if (el.closest("#job-guide") || el.closest("#job-help")) return;
+  setGuide(false);
 });
 
 tabs.addEventListener("click", (event) => {

@@ -4,8 +4,10 @@
   --ink: #f2f4ec;
   --muted: #9aa392;
   --line: #24281f;
-  --accent: #d6ff3f;
+  --accent: #ffb8d4;
   --card: #12140f;
+  --pop: #171a11;
+  --pop-line: #2f3427;
 }
 
 * { box-sizing: border-box; }
@@ -111,6 +113,165 @@ button {
 .intent em {
   font-style: normal;
   opacity: 0.7;
+}
+
+.field-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.help {
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.help:hover {
+  color: var(--ink);
+  border-color: var(--muted);
+}
+
+.help.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #11140c;
+}
+
+.guide {
+  position: absolute;
+  top: calc(100% + 9px);
+  left: -4px;
+  right: -4px;
+  z-index: 20;
+  padding: 12px;
+  background: var(--pop);
+  border: 1px solid var(--pop-line);
+  border-radius: 10px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+  animation: guide-in 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.guide[hidden] { display: none; }
+
+.guide::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 33px;
+  width: 8px;
+  height: 8px;
+  background: var(--pop);
+  border-left: 1px solid var(--pop-line);
+  border-top: 1px solid var(--pop-line);
+  border-radius: 1px;
+  transform: rotate(45deg);
+}
+
+@keyframes guide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+}
+
+.guide-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.guide-head strong {
+  font-size: 12px;
+  letter-spacing: -0.01em;
+}
+
+.guide-x {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.guide-x:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+}
+
+.guide-lede {
+  margin: 5px 0 10px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.guide-list {
+  display: grid;
+  gap: 2px;
+}
+
+.guide-list button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 7px 9px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 7px;
+  transition: background 120ms ease;
+}
+
+.guide-list button:hover { background: rgba(255, 255, 255, 0.045); }
+
+.guide-list button.on {
+  background: rgba(255, 184, 212, 0.07);
+  border-left-color: var(--accent);
+}
+
+.guide-list strong {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.guide-list button.on strong { color: var(--accent); }
+
+.guide-list small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.guide-foot {
+  margin: 9px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10px;
+}
+
+:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .job-row {
@@ -231,6 +392,33 @@ select {
 }
 
 .scan-line[hidden] { display: none; }
+
+.scan-stack {
+  display: grid;
+  gap: 5px;
+  margin: 8px 0 6px;
+}
+
+.stack-row {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.stack-row span {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding-top: 1px;
+}
+
+.stack-row p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
 
 .summary {
   display: flex;
