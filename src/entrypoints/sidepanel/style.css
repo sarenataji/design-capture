@@ -14,16 +14,19 @@
 
 html, body {
   margin: 0;
-  height: 100%;
   background: var(--bg);
   color: var(--ink);
   font: 13px/1.45 ui-sans-serif, system-ui, sans-serif;
 }
 
-body {
-  display: grid;
-  grid-template-rows: auto auto auto auto auto auto auto 1fr auto;
+html {
   min-height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
 .top, .jobs, .intent, .filters, .scan, .tabs, pre, footer {
@@ -259,7 +262,7 @@ button {
   color: var(--ink);
 }
 
-.guide-lede {
+.guide .guide-lede {
   margin: 5px 0 10px;
   color: var(--muted);
   font-size: 11px;
@@ -305,7 +308,40 @@ button.guide-row:hover { background: rgba(255, 255, 255, 0.045); }
   line-height: 1.45;
 }
 
-.guide-foot {
+.color-row {
+  grid-template-columns: 28px 1fr;
+  align-items: center;
+  gap: 1px 11px;
+  padding: 8px 9px;
+}
+
+.color-row i {
+  grid-row: span 2;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+}
+
+.color-row code {
+  font: 650 15px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: -0.02em;
+}
+
+.color-row small {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.color-row.copied {
+  background: rgba(255, 184, 212, 0.09);
+  border-left-color: var(--accent);
+}
+
+.color-row.copied code { color: var(--accent); }
+
+.guide .guide-foot {
   margin: 9px 0 0;
   padding-top: 8px;
   border-top: 1px solid var(--line);
@@ -388,11 +424,18 @@ select {
   font-size: 11px;
 }
 
+.scan-source {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  word-break: break-word;
+}
+
 .scan-colors {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
+  gap: 5px;
 }
 
 .chip {
@@ -427,20 +470,9 @@ select {
   color: var(--accent);
 }
 
-.scan-line {
-  margin: 0 0 4px;
-  color: var(--ink);
-  font-size: 11px;
-  line-height: 1.4;
-  word-break: break-word;
-}
-
-.scan-line[hidden] { display: none; }
-
-.scan-stack {
+.scan-rows {
   display: grid;
-  gap: 5px;
-  margin: 8px 0 6px;
+  gap: 7px;
 }
 
 .stack-row {
@@ -448,6 +480,12 @@ select {
   grid-template-columns: 88px 1fr;
   gap: 8px;
   align-items: start;
+}
+
+.stack-row em {
+  font-style: normal;
+  color: var(--muted);
+  opacity: 0.7;
 }
 
 .stack-row span {
@@ -461,10 +499,12 @@ select {
 .stack-row p {
   margin: 0;
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.4;
+  word-break: break-word;
 }
 
 .summary {
+  position: relative;
   display: flex;
   justify-content: space-between;
   gap: 10px;
@@ -487,12 +527,33 @@ select {
   font-size: 11px;
 }
 
+.summary .guide {
+  left: -4px;
+  right: -4px;
+}
+
+.count {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  font: inherit;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.count:hover, .count.on { color: var(--accent); }
+
 .swatches {
   display: flex;
   flex-wrap: wrap;
+  align-content: flex-start;
   gap: 4px;
   justify-content: flex-end;
   max-width: 42%;
+  padding: 0;
+  background: transparent;
+  border: 0;
 }
 
 .swatches i {
@@ -535,6 +596,7 @@ select {
 pre {
   margin: 0;
   padding: 12px 14px;
+  flex: 1;
   min-height: 0;
   overflow: auto;
   white-space: pre-wrap;

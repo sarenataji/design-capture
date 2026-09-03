@@ -14,7 +14,7 @@ Scan is a separate action. Turn the picker on for components; hit **Scan page** 
 ## Beats
 
 1. **Inspect** — hover. Tooltip with tag, size, type, color, radius, padding/gap, selector.
-2. **Photocopy** — click. Exact spec for that component.
+2. **Photocopy** — click. Exact spec for that component, including descendant CSS/WAAPI motion, triggers, timing, easing, properties, keyframes, and detected motion libraries.
 3. **Prompt** — photocopy + Job / Intent. Includes the scan if you ran one.
 4. **Scan page** — palette, type, spacing/radius ladder, detected stack.
 
@@ -52,7 +52,7 @@ Not used, on purpose: Plasmo, React, html2canvas, `chrome.debugger`, accounts, u
 | Action | You get |
 | --- | --- |
 | Hover | This node’s facts |
-| Photocopy | This component’s spec |
+| Photocopy | This component’s spec, screenshot-sampled visible palette, CSS colors, motion effects, keyframes, and library evidence |
 | Prompt | That spec + job/intent (+ scan if present) |
 | Scan page | Palette, type, tokens, detected stack |
 | DESIGN.md / SKILL.md | System file; prefers scan when you ran one |

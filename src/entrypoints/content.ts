@@ -1,6 +1,7 @@
 import { createPicker } from "../lib/picker";
 import { scanPage } from "../lib/scan";
 import { STORAGE_KEYS } from "../lib/storage";
+import { captureVisibleColors } from "../lib/visual";
 import type { Job, OutputKind, PageScan, Target } from "../lib/types";
 
 export default defineContentScript({
@@ -58,21 +59,35 @@ export default defineContentScript({
       onCapture: (result) => {
         void browser.runtime.sendMessage({ type: "save-capture", payload: result });
       },
+      onPreview: (result) => {
+        void browser.runtime.sendMessage({ type: "preview-capture", payload: result });
+      },
     });
 
-    browser.runtime.onMessage.addListener((message) => {
+    browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message?.type === "toggle-picker") picker.toggle();
       if (message?.type === "start-picker") picker.start();
       if (message?.type === "stop-picker") picker.stop();
       if (message?.type === "scan-page") {
         void (async () => {
-          const globals = (await browser.runtime
-            .sendMessage({ type: "probe-globals" })
-            .catch(() => [])) as { name: string; kind: string }[];
-          const result = scanPage(Array.isArray(globals) ? globals : []);
-          void browser.runtime.sendMessage({ type: "save-scan", payload: result });
+          try {
+            const globals = (await browser.runtime
+              .sendMessage({ type: "probe-globals" })
+              .catch(() => [])) as { name: string; kind: string }[];
+            const visualColors = await captureVisibleColors();
+            const result = scanPage(
+              Array.isArray(globals) ? globals : [],
+              visualColors,
+            );
+            void browser.runtime.sendMessage({ type: "save-scan", payload: result });
+            sendResponse(result);
+          } catch (error) {
+            sendResponse({ error: String(error) });
+          }
         })();
+        return true;
       }
+      return false;
     });
   },
 });

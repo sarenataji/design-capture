@@ -5,7 +5,7 @@ export const OUTPUTS: { id: OutputKind; label: string; plain: string }[] = [
     id: "photocopy",
     label: "Photocopy",
     plain:
-      "An exact recipe of the thing you clicked — every colour, size and gap, measured, not guessed.",
+      "An exact recipe of the thing you clicked — every color, size and gap, measured, not guessed.",
   },
   {
     id: "prompt",

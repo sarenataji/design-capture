@@ -7,7 +7,8 @@ declare namespace chrome {
     function executeScript(injection: {
       target: { tabId: number };
       world?: "ISOLATED" | "MAIN";
-      func: () => unknown;
+      func?: () => unknown;
+      files?: string[];
     }): Promise<{ result?: unknown }[]>;
   }
 }

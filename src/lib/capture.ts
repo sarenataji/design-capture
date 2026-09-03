@@ -2,6 +2,7 @@ import { captureAssets, sanitizeHtml } from "./assets";
 import { baselineForTag, changedStyles, diffStyles, readStyles } from "./css";
 import { cssSelector, visibleText } from "./selector";
 import { captureMotion, captureStates } from "./states";
+import { detectStack } from "./detect";
 import { captureContrast, captureTokens } from "./tokens";
 import type {
   CaptureOptions,
@@ -73,7 +74,7 @@ export function captureElement(
   const job: Job = options.job ?? "rebuild";
   const live = options.liveStyles ?? {};
   const node = captureNode(el, 0, live);
-  const motion = captureMotion(el);
+  const motion = captureMotion(el, options.detected ?? detectStack());
   return {
     url: location.href,
     title: document.title,
@@ -90,7 +91,8 @@ export function captureElement(
       motion:
         motion.transitions.length > 0 ||
         motion.animations.length > 0 ||
-        motion.keyframes.length > 0,
+        motion.keyframes.length > 0 ||
+        motion.effects.length > 0,
     },
     tokens: captureTokens(el),
     pageTokens: captureTokens(),

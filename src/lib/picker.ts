@@ -3,6 +3,7 @@ import { cssColorToHex } from "./color";
 import { readStyles } from "./css";
 import { outputLabel, renderOutput } from "./prompt";
 import { STORAGE_KEYS } from "./storage";
+import { captureVisibleColors } from "./visual";
 import type {
   CaptureResult,
   Job,
@@ -16,6 +17,7 @@ const HOST_ID = "design-capture-root";
 
 type PickerOptions = {
   onCapture: (result: CaptureResult) => void;
+  onPreview: (result: CaptureResult) => void;
   getTarget: () => Target;
   getIntent: () => string;
   getJob: () => Job;
@@ -45,6 +47,7 @@ export function createPicker(options: PickerOptions) {
   let overlay: HTMLDivElement | null = null;
   let toastEl: HTMLDivElement | null = null;
   let toastTimer = 0;
+  let previewSeq = 0;
   let liveStyles: StyleMap = {};
 
   function ensureUi() {
@@ -270,6 +273,7 @@ export function createPicker(options: PickerOptions) {
     if (isOurNode(el)) return;
     current = el;
     paint();
+    if (locked) void preview(el);
   }
 
   function walk(which: "parent" | "child") {
@@ -309,7 +313,9 @@ export function createPicker(options: PickerOptions) {
     locked = next;
     if (next) expanded = true;
     paint();
-    if (next) toast("Locked — ↵ capture, click to release");
+    if (!next || !current) return;
+    void preview(current);
+    toast("Locked — sent to panel · ↵ copies");
   }
 
   function onKey(event: KeyboardEvent) {
@@ -340,18 +346,36 @@ export function createPicker(options: PickerOptions) {
     }
   }
 
-  async function commit(el: Element) {
+  /** Shields the pointer so hover styles drop out of the resting measurement. */
+  async function measure(el: Element) {
     const hovered = liveStyles;
+    const scan = options.getScan();
     overlay?.classList.add("shield");
     await frames(2);
-    const kind = options.getOutputKind();
     const result = captureElement(el, {
       target: options.getTarget(),
       intent: options.getIntent(),
       job: options.getJob(),
       liveStyles: hovered,
+      detected: scan?.url === location.href ? scan.detected : undefined,
     });
+    if (host) host.style.display = "none";
+    await frames(2);
+    result.tokens.visualColors = await captureVisibleColors(result.node.box);
+    if (host) host.style.display = "";
     overlay?.classList.remove("shield");
+    return result;
+  }
+
+  async function preview(el: Element) {
+    const seq = (previewSeq += 1);
+    const result = await measure(el);
+    if (seq === previewSeq) options.onPreview(result);
+  }
+
+  async function commit(el: Element) {
+    const kind = options.getOutputKind();
+    const result = await measure(el);
     const text = renderOutput(kind, result, options.getScan());
     void navigator.clipboard.writeText(text).catch(() => {});
     options.onCapture(result);
@@ -380,7 +404,7 @@ export function createPicker(options: PickerOptions) {
     document.addEventListener("pointerdown", onPointer, true);
     document.addEventListener("click", onPointer, true);
     document.addEventListener("keydown", onKey, true);
-    toast("Hover — inspect. Click — lock specs.");
+    toast("Hover — inspect. Click — lock and send to panel.");
   }
 
   function stop() {
@@ -429,7 +453,7 @@ function tipHtml(
     </div>`;
 
   const hint = state.locked
-    ? `<div class="hint on">Locked · ↵ capture · click to release</div>`
+    ? `<div class="hint on">Locked · in panel · ↵ copy · click release</div>`
     : `<div class="hint">${state.expanded ? "Tab hide specs" : "Tab specs"} · click lock</div>`;
 
   if (!state.expanded) return `${head}${selectorHtml(preview.selector, true)}${hint}`;

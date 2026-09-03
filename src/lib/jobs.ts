@@ -20,7 +20,7 @@ export const JOBS: {
     sentence:
       "Keep our screens. Absorb this look (type, density, radius, color roles).",
     plain:
-      "Keep your pages, just borrow the look: fonts, colours, rounded corners.",
+      "Keep your pages, just borrow the look: fonts, colors, rounded corners.",
   },
   {
     id: "system",

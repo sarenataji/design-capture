@@ -1,6 +1,14 @@
 import { KIND_LABEL, KIND_ORDER } from "./detect";
 import type { DetectedKind, PageScan } from "./types";
 
+function sourceName(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "") || url;
+  } catch {
+    return url;
+  }
+}
+
 export function stackByKind(scan: PageScan): { kind: DetectedKind; label: string; names: string[] }[] {
   const groups = new Map<DetectedKind, string[]>();
   for (const item of scan.detected) {
@@ -26,6 +34,9 @@ function stackMarkdown(scan: PageScan): string {
 }
 
 export function toScanMd(scan: PageScan): string {
+  const visualColors = (scan.visualColors ?? [])
+    .map((c) => `- visual ${c.value}`)
+    .join("\n");
   const colors = scan.colors
     .map((c) => `- ${c.role} ${c.value}`)
     .join("\n");
@@ -44,10 +55,12 @@ export function toScanMd(scan: PageScan): string {
     `# Site scan
 Measured from the live page. Stack is **detected** (scripts, DOM, CSS, loaded URLs, page globals) — not inferred from Figma.`,
     `## Source
-${scan.title}
+${sourceName(scan.url)}
 ${scan.url}
 Viewport ${scan.viewport.width}×${scan.viewport.height}`,
-    `## Palette
+    `## Visible palette (sampled pixels)
+${visualColors || "- unavailable"}`,
+    `## CSS palette
 ${colors || "- none"}`,
     `## Type
 ${type || "- none"}`,
@@ -67,6 +80,9 @@ ${stackMarkdown(scan)}`,
 }
 
 export function scanToTokenBlock(scan: PageScan): string {
+  const visualColors = (scan.visualColors ?? [])
+    .map((c) => `- ${c.value} · visible pixel`)
+    .join("\n");
   const colors = scan.colors
     .map((c) => `- ${c.value} · ${c.role}`)
     .join("\n");
@@ -76,7 +92,10 @@ export function scanToTokenBlock(scan: PageScan): string {
         `- ${f.family} · weights ${f.weights.join("/") || "—"} · ${f.sizes.join(", ") || "—"}`,
     )
     .join("\n");
-  return `Palette:
+  return `Visible palette:
+${visualColors || "- unavailable"}
+
+CSS palette:
 ${colors || "- none"}
 
 Type:

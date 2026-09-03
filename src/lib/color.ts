@@ -193,6 +193,25 @@ export function cssColorToHex(value: string): string | null {
   return rgbaToHex(parsed);
 }
 
+export function cssAlpha(value: string): number {
+  return parseCssColor(value)?.a ?? 0;
+}
+
+/** Flattens a translucent color onto what sits behind it, the way a screen does. */
+export function compositeToHex(value: string, backdrop: string): string | null {
+  const top = parseCssColor(value);
+  if (!top) return null;
+  if (top.a >= 1) return rgbaToHex(top);
+  const base = parseCssColor(backdrop) ?? { r: 1, g: 1, b: 1, a: 1 };
+  const a = clamp01(top.a);
+  return rgbaToHex({
+    r: top.r * a + base.r * (1 - a),
+    g: top.g * a + base.g * (1 - a),
+    b: top.b * a + base.b * (1 - a),
+    a: 1,
+  });
+}
+
 export function relativeLuminance(hex: string): number {
   const raw = hex.replace("#", "").slice(0, 6);
   const toLin = (c: number) => {

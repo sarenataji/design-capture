@@ -158,11 +158,8 @@
         </div>
         <button type="button" id="copy-scan" class="ghost">Copy scan</button>
       </div>
-      <div id="scan-colors" class="scan-colors"></div>
-      <p id="scan-type" class="scan-line"></p>
-      <p id="scan-space" class="scan-line"></p>
-      <div id="scan-stack" class="scan-stack"></div>
-      <p id="scan-vars" class="scan-line" hidden></p>
+      <p id="scan-source" class="scan-source"></p>
+      <div id="scan-rows" class="scan-rows"></div>
 
       <div
         id="scan-guide"
@@ -177,32 +174,36 @@
           <button type="button" class="guide-x" aria-label="Close">×</button>
         </div>
         <p class="guide-lede">
-          What this page is made of, measured from the page itself.
+          Every visible element on screen was read, then the values that repeat
+          were kept. One-offs are dropped, so what's left is the real system.
         </p>
         <div class="guide-list">
           <div class="guide-row">
-            <strong>Colour swatches</strong>
-            <small>Grouped by where each is used. Tap one to copy it.</small>
+            <strong>Palette</strong>
+            <small>Colors labelled by use — bg, text, accent, border. Tap to copy.</small>
           </div>
           <div class="guide-row">
-            <strong>The font line</strong>
-            <small>The typeface, its weights, and every text size found.</small>
+            <strong>Type</strong>
+            <small>Each typeface with its weights and the sizes it appears at.</small>
           </div>
           <div class="guide-row">
             <strong>Space and radius</strong>
             <small>Gaps between things, and how round the corners are.</small>
           </div>
           <div class="guide-row">
-            <strong>Framework</strong>
-            <small>The main tool the site was built with, like Next.js.</small>
+            <strong>Shadow</strong>
+            <small>Depth recipes used more than once.</small>
           </div>
           <div class="guide-row">
-            <strong>Analytics</strong>
-            <small>What the site uses to measure its visitors.</small>
+            <strong>:root vars</strong>
+            <small>Design tokens the site defines in its own stylesheet.</small>
           </div>
           <div class="guide-row">
-            <strong>Build</strong>
-            <small>The tool that packaged the site's code.</small>
+            <strong>The rows below</strong>
+            <small>
+              What the site is built with — framework, styling, motion, host.
+              Found in its code, not guessed.
+            </small>
           </div>
         </div>
       </div>
@@ -211,9 +212,42 @@
     <section id="summary" class="summary empty" hidden>
       <div>
         <strong id="sum-title">No capture yet</strong>
-        <p id="sum-meta"></p>
+        <p id="sum-meta">
+          <span id="sum-meta-text"></span>
+          <button
+            type="button"
+            id="sum-colors"
+            class="count"
+            data-guide="colors-guide"
+            aria-expanded="false"
+            aria-controls="colors-guide"
+            hidden
+          ></button>
+        </p>
       </div>
-      <div id="swatches" class="swatches"></div>
+      <button
+        type="button"
+        id="swatches"
+        class="swatches"
+        data-guide="colors-guide"
+        aria-label="Show color codes"
+      ></button>
+
+      <div
+        id="colors-guide"
+        class="guide"
+        role="dialog"
+        aria-label="Colors in this capture"
+        tabindex="-1"
+        hidden
+      >
+        <div class="guide-head">
+          <strong>Colors in this capture</strong>
+          <button type="button" class="guide-x" aria-label="Close">×</button>
+        </div>
+        <p class="guide-lede">Tap any color to copy its code.</p>
+        <div id="colors-guide-list" class="guide-list"></div>
+      </div>
     </section>
 
     <section class="outputs">
@@ -259,7 +293,7 @@
       </div>
     </section>
 
-    <pre id="out">Alt+Shift+D · hover facts (no AI) · click to capture. Photocopy is the spec. Prompt wraps it with Job + Intent.</pre>
+    <pre id="out">Alt+Shift+D · hover reads facts (no AI) · click locks the element and fills this panel · ↵ copies. Photocopy is the spec. Prompt wraps it with Job + Intent.</pre>
 
     <footer>
       <span><kbd>⌥⇧D</kbd> picker</span>

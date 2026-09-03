@@ -1,4 +1,10 @@
-import { colorDistance, cssColorToHex, hexChroma } from "./color";
+import {
+  colorDistance,
+  compositeToHex,
+  cssAlpha,
+  cssColorToHex,
+  hexChroma,
+} from "./color";
 import { isEmptyValue } from "./css";
 import { detectStack } from "./detect";
 import type { ColorRole, PageScan, ScanColor, ScanTypeface } from "./types";
@@ -43,6 +49,56 @@ type ColorHit = {
   roles: Set<ColorRole>;
 };
 
+const WHITE = "#ffffff";
+
+/**
+ * What the viewport is actually painted with. `html` covers the canvas, `body`
+ * paints over it, and an untouched page falls through to the browser's white.
+ */
+function canvasBackground(): { color: string; bodyPropagated: boolean } {
+  const html = getComputedStyle(document.documentElement).backgroundColor;
+  if (cssAlpha(html) > 0) {
+    return {
+      color: compositeToHex(html, WHITE) ?? WHITE,
+      bodyPropagated: false,
+    };
+  }
+
+  const body = document.body
+    ? getComputedStyle(document.body).backgroundColor
+    : "transparent";
+  return {
+    color: compositeToHex(body, WHITE) ?? WHITE,
+    bodyPropagated: cssAlpha(body) > 0,
+  };
+}
+
+/**
+ * The color a person sees behind `el`, blending every translucent ancestor down
+ * to the canvas. Memoized per element, so the whole tree costs one pass.
+ */
+function makeSurface(canvas: string, bodyPropagated: boolean) {
+  const cache = new Map<Element, string>();
+  const surface = (el: Element | null): string => {
+    // The root, and a body propagated through a transparent root, are already
+    // represented by the canvas. A body below a painted root remains a normal
+    // ancestor surface and is composited below.
+    if (
+      !el ||
+      el === document.documentElement ||
+      (bodyPropagated && el === document.body)
+    ) return canvas;
+    const cached = cache.get(el);
+    if (cached) return cached;
+    const under = surface(el.parentElement);
+    const own = getComputedStyle(el).backgroundColor;
+    const resolved = compositeToHex(own, under) ?? under;
+    cache.set(el, resolved);
+    return resolved;
+  };
+  return surface;
+}
+
 function mergeColors(hits: ColorHit[]): ColorHit[] {
   const sorted = [...hits].sort((a, b) => b.count - a.count);
   const out: ColorHit[] = [];
@@ -72,7 +128,7 @@ function pickPalette(hits: ColorHit[]): ScanColor[] {
   const out: ScanColor[] = [];
 
   const take = (hit: ColorHit | undefined, role: ColorRole) => {
-    if (!hit || used.has(hit.value) || out.length >= 8) return;
+    if (!hit || used.has(hit.value) || out.length >= 10) return;
     used.add(hit.value);
     out.push({ value: hit.value, role, count: hit.count });
   };
@@ -153,7 +209,9 @@ function isOurRoot(el: Element): boolean {
   );
 }
 
-function walkVisible(limit = 800): Element[] {
+export const WALK_LIMIT = 800;
+
+function walkVisible(limit = WALK_LIMIT): Element[] {
   const out: Element[] = [];
   if (!document.body) return out;
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
@@ -171,6 +229,7 @@ function walkVisible(limit = 800): Element[] {
 
 export function scanPage(
   globals: { name: string; kind: string }[] = [],
+  visualColors: ScanColor[] = [],
 ): PageScan {
   const elements = walkVisible();
   const colors = new Map<string, ColorHit>();
@@ -181,6 +240,15 @@ export function scanPage(
   const spacing = new Map<string, number>();
   const radii = new Map<string, number>();
   const shadows = new Map<string, number>();
+  const canvas = canvasBackground();
+  const surface = makeSurface(canvas.color, canvas.bodyPropagated);
+
+  colors.set(canvas.color, {
+    value: canvas.color,
+    count: 1,
+    area: Math.max(1, window.innerWidth * window.innerHeight),
+    roles: new Set<ColorRole>(["bg"]),
+  });
 
   for (const el of elements) {
     const style = getComputedStyle(el);
@@ -188,7 +256,7 @@ export function scanPage(
     const area = Math.max(1, rect.width * rect.height);
     const hasText = (el.textContent ?? "").trim().length > 0;
 
-    const bg = cssColorToHex(style.backgroundColor);
+    const bg = compositeToHex(style.backgroundColor, surface(el.parentElement));
     if (bg) {
       const hit = colors.get(bg) ?? {
         value: bg,
@@ -289,7 +357,9 @@ export function scanPage(
     title: document.title,
     scannedAt: new Date().toISOString(),
     viewport: { width: window.innerWidth, height: window.innerHeight },
+    elements: elements.length,
     colors: pickPalette([...colors.values()]),
+    visualColors,
     fonts: typefaces,
     spacing: ladder(spacing),
     radii: ladder(radii, 2, 8),

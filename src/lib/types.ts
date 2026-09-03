@@ -59,10 +59,32 @@ export type MotionCapture = {
   transitions: string[];
   animations: string[];
   keyframes: { name: string; css: string }[];
+  /** Normalized, per-element motion specs (selected node and visible descendants). */
+  effects: MotionEffectCapture[];
+  /** Motion/graphics libraries detected on the page. Presence is evidence, not attribution. */
+  libraries: DetectedLib[];
+};
+
+export type MotionEffectCapture = {
+  type: "transition" | "css-animation" | "web-animation";
+  target: string;
+  trigger: "hover" | "focus" | "active" | "scroll" | "load/auto" | "runtime/unknown";
+  properties: string[];
+  duration: string;
+  delay: string;
+  easing: string;
+  iterations: string;
+  direction: string;
+  fill: string;
+  playState?: string;
+  timeline?: string;
+  keyframes?: Record<string, string | number | null>[];
 };
 
 export type TokenCapture = {
   colors: { value: string; count: number; roles: string[] }[];
+  /** Colors sampled from rendered pixels; includes canvas, WebGL, images, and video. */
+  visualColors?: ScanColor[];
   fonts: { family: string; weights: string[]; sizes: string[] }[];
   spacing: string[];
   radii: string[];
@@ -87,7 +109,7 @@ export type ContrastPair = {
   aaa: boolean;
 };
 
-export type ColorRole = "bg" | "text" | "accent" | "border";
+export type ColorRole = "bg" | "text" | "accent" | "border" | "visual";
 
 export type ScanColor = {
   value: string;
@@ -137,7 +159,11 @@ export type PageScan = {
   title: string;
   scannedAt: string;
   viewport: { width: number; height: number };
+  /** Visible elements measured. Caps out at the walker limit on large pages. */
+  elements: number;
   colors: ScanColor[];
+  /** Palette sampled from the rendered viewport rather than CSS declarations. */
+  visualColors?: ScanColor[];
   fonts: ScanTypeface[];
   spacing: string[];
   radii: string[];
@@ -152,6 +178,8 @@ export type CaptureOptions = {
   job?: Job;
   /** Computed styles while the pointer was over the node (may include :hover). */
   liveStyles?: StyleMap;
+  /** A same-page scan can contribute stronger library detection (including globals). */
+  detected?: DetectedLib[];
 };
 
 export type CaptureResult = {

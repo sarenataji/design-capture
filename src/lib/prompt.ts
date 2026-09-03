@@ -11,6 +11,14 @@ import type {
   TokenCapture,
 } from "./types";
 
+function sourceName(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "") || url;
+  } catch {
+    return url;
+  }
+}
+
 function stylesBlock(title: string, styles: StyleMap): string {
   const entries = Object.entries(styles);
   if (!entries.length) return "";
@@ -74,6 +82,9 @@ function tokensFor(capture: CaptureResult): TokenCapture {
 }
 
 function formatTokens(tokens: TokenCapture): string {
+  const visual = (tokens.visualColors ?? [])
+    .map((c) => `- ${c.value} · sampled from visible pixels`)
+    .join("\n");
   const colors = tokens.colors
     .slice(0, 12)
     .map((c) => `- ${c.value} · ${c.roles.join(", ") || "other"} · seen ${c.count}×`)
@@ -88,7 +99,10 @@ function formatTokens(tokens: TokenCapture): string {
     .slice(0, 24)
     .map((v) => `- \`${v.name}\`: ${v.value}`)
     .join("\n");
-  return `Colors:
+  return `Visible palette (includes canvas/WebGL/images/video):
+${visual || "- not sampled"}
+
+CSS colors (implementation values):
 ${colors || "- none"}
 
 Type:
@@ -123,9 +137,46 @@ function measured(capture: CaptureResult) {
       capture.measured?.motion ??
       capture.motion.transitions.length +
         capture.motion.animations.length +
-        capture.motion.keyframes.length >
+        capture.motion.keyframes.length +
+        (capture.motion.effects?.length ?? 0) >
         0,
   };
+}
+
+function formatMotion(capture: CaptureResult): string {
+  const effects = capture.motion.effects ?? [];
+  const specs = effects.map((effect, index) => {
+    const details = [
+      `- **${index + 1}. ${effect.type}** on \`${effect.target}\``,
+      `  - Trigger: ${effect.trigger}`,
+      `  - Properties: ${effect.properties.join(", ") || "resolved by keyframes"}`,
+      `  - Timing: ${effect.duration} duration · ${effect.delay} delay · ${effect.easing}`,
+      `  - Playback: ${effect.iterations} iteration(s) · ${effect.direction} · fill ${effect.fill}${effect.playState ? ` · ${effect.playState}` : ""}`,
+      effect.timeline ? `  - Timeline: ${effect.timeline}` : "",
+      effect.type === "web-animation" && effect.keyframes?.length
+        ? `  - Runtime keyframes:\n\n\`\`\`json\n${JSON.stringify(effect.keyframes, null, 2)}\n\`\`\``
+        : "",
+    ].filter(Boolean);
+    return details.join("\n");
+  }).join("\n\n");
+  const libraries = (capture.motion.libraries ?? [])
+    .map((lib) => `- ${lib.name} · ${lib.kind} · detected via ${lib.via}`)
+    .join("\n");
+  const raw = [
+    ...capture.motion.transitions.map((item) => `transition: ${item}`),
+    ...capture.motion.animations.map((item) => `animation: ${item}`),
+    ...capture.motion.keyframes.map((item) => item.css),
+  ].join("\n");
+  if (!effects.length && !libraries && !raw) return "";
+
+  return [
+    `Captured at selection time. CSS declarations and currently existing Web Animations API effects are measurable; a JS animation created only after an untested click, scroll position, or route change is not observable yet.`,
+    specs ? `### Effects\n${specs}` : "",
+    libraries
+      ? `### Libraries detected on this page\n${libraries}\n\nLibrary presence does not prove this exact element uses it; reproduce the measured effects above.`
+      : `### Libraries\nNo motion library detected. This may be CSS, Web Animations API, or bundled code whose name is not exposed.`,
+    raw ? `### Reusable CSS\n\`\`\`css\n${raw}\n\`\`\`` : "",
+  ].filter(Boolean).join("\n\n");
 }
 
 export function toPhotocopy(capture: CaptureResult): string {
@@ -134,11 +185,7 @@ export function toPhotocopy(capture: CaptureResult): string {
   const hover = stylesBlock(`${capture.node.tag}:hover`, capture.node.hover);
   const focus = stylesBlock(`${capture.node.tag}:focus`, capture.node.focus);
   const active = stylesBlock(`${capture.node.tag}:active`, capture.node.active);
-  const motion = [
-    ...capture.motion.transitions.map((t) => `transition: ${t}`),
-    ...capture.motion.animations.map((a) => `animation: ${a}`),
-    ...capture.motion.keyframes.map((k) => k.css),
-  ].join("\n");
+  const motion = formatMotion(capture);
   const assets = capture.assets
     .slice(0, 12)
     .map((asset) => {
@@ -156,8 +203,8 @@ export function toPhotocopy(capture: CaptureResult): string {
 Exact spec for the **selected** component. Rebuild this card/button 1:1.
 Drop logos and legal copy unless you truly want a clone of the company.
 This is not a prompt. Nothing here is a guess unless labeled.`,
-    `## Source
-${capture.title}
+`## Source
+${sourceName(capture.url)}
 ${capture.url}
 Viewport ${capture.viewport.width}×${capture.viewport.height}
 \`${capture.selector}\` · ${capture.node.box.width}×${capture.node.box.height}`,
@@ -190,10 +237,7 @@ ${active}
 \`\`\``
       : "",
     motion
-      ? `## Motion (measured)
-\`\`\`css
-${motion}
-\`\`\``
+      ? `## Motion (${flags.motion ? "measured" : "library evidence only"})\n${motion}`
       : `## Motion
 not measured — don't invent`,
     `## Tokens (this component)
@@ -309,7 +353,7 @@ export function toDesignMd(
 
   return `# DESIGN.md
 
-Visual language measured from [${capture.title}](${capture.url}).
+Visual language measured from [${sourceName(capture.url)}](${capture.url}).
 This file is the source of truth for look. Product copy and brand live elsewhere.
 
 ## How to use
@@ -359,7 +403,7 @@ export function toSkillMd(
   const job = resolveJob(capture);
   return `---
 name: captured-design
-description: Apply the measured design language from ${capture.title}. Job: ${job}.
+description: Apply the measured design language from ${sourceName(capture.url)}. Job: ${job}.
 ---
 
 # Captured design skill

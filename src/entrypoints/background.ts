@@ -31,6 +31,13 @@ export default defineBackground(() => {
       });
       sendResponse({ ok: true });
     }
+    if (message?.type === "preview-capture") {
+      void browser.storage.local.set({
+        [STORAGE_KEYS.lastCapture]: message.payload,
+        [STORAGE_KEYS.lastCaptureAt]: Date.now(),
+      });
+      sendResponse({ ok: true });
+    }
     if (message?.type === "save-scan") {
       void browser.storage.local.set({
         [STORAGE_KEYS.lastScan]: message.payload,
@@ -54,6 +61,16 @@ export default defineBackground(() => {
           sendResponse(results[0]?.result ?? []);
         })
         .catch(() => sendResponse([]));
+      return true;
+    }
+    if (message?.type === "capture-visible-tab") {
+      const windowId = sender.tab?.windowId;
+      const screenshot = windowId === undefined
+        ? browser.tabs.captureVisibleTab({ format: "png" })
+        : browser.tabs.captureVisibleTab(windowId, { format: "png" });
+      void screenshot
+        .then((dataUrl) => sendResponse({ dataUrl }))
+        .catch(() => sendResponse({}));
       return true;
     }
     return false;
