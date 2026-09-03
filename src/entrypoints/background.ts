@@ -1,0 +1,35 @@
+import { STORAGE_KEYS } from "../lib/storage";
+
+export default defineBackground(() => {
+  chrome.sidePanel
+    .setPanelBehavior({ openPanelOnActionClick: true })
+    .catch(() => {});
+
+  async function openAndToggle(tabId: number) {
+    await chrome.sidePanel.open({ tabId }).catch(() => {});
+    await browser.tabs.sendMessage(tabId, { type: "toggle-picker" }).catch(() => {});
+  }
+
+  browser.action.onClicked.addListener(async (tab) => {
+    if (tab.id) await openAndToggle(tab.id);
+  });
+
+  browser.commands.onCommand.addListener(async (command) => {
+    if (command !== "toggle-picker") return;
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+    await openAndToggle(tab.id);
+  });
+
+  browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === "save-capture") {
+      void browser.storage.local.set({
+        [STORAGE_KEYS.lastCapture]: message.payload,
+        [STORAGE_KEYS.lastCaptureAt]: Date.now(),
+        [STORAGE_KEYS.pickerActive]: false,
+      });
+      sendResponse({ ok: true });
+    }
+    return false;
+  });
+});

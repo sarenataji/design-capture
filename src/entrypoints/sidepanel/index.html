@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Design Capture</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div>
+        <p class="kicker" id="status">Idle</p>
+        <h1>Design Capture</h1>
+      </div>
+      <div class="actions">
+        <button id="pick" type="button">Pick</button>
+        <button id="copy" type="button" class="ghost">Copy</button>
+      </div>
+    </header>
+
+    <label class="intent">
+      <span>Intent <em>fills first — this shapes the prompt</em></span>
+      <textarea
+        id="intent"
+        rows="3"
+        placeholder="Dark product board. Our accent. Do not clone branding."
+      ></textarea>
+    </label>
+
+    <div class="filters">
+      <label>
+        <span>Direction</span>
+        <select id="direction">
+          <option value="rebuild">Rebuild into our product</option>
+          <option value="restyle">Restyle ours with this look</option>
+          <option value="system">System only — DESIGN.md</option>
+          <option value="translate">Translate stack</option>
+          <option value="motion">Motion / states only</option>
+        </select>
+      </label>
+      <label>
+        <span>Target</span>
+        <select id="target">
+          <option value="auto">Auto (this repo)</option>
+          <option value="react">React</option>
+          <option value="react-native">React Native</option>
+          <option value="tailwind">Tailwind</option>
+          <option value="html">HTML / CSS</option>
+        </select>
+      </label>
+    </div>
+
+    <section id="summary" class="summary empty" hidden>
+      <div>
+        <strong id="sum-title">No capture yet</strong>
+        <p id="sum-meta"></p>
+      </div>
+      <div id="swatches" class="swatches"></div>
+    </section>
+
+    <nav class="tabs" id="tabs" aria-label="Output format">
+      <button type="button" data-kind="prompt" class="on">Prompt</button>
+      <button type="button" data-kind="design-md">DESIGN.md</button>
+      <button type="button" data-kind="skill-md">SKILL.md</button>
+      <button type="button" data-kind="css">CSS</button>
+      <button type="button" data-kind="tailwind">Tailwind</button>
+    </nav>
+
+    <pre id="out">Alt+Shift+D · hover · click. Prompt copies automatically.</pre>
+
+    <footer>
+      <span><kbd>⌥⇧D</kbd> picker</span>
+      <span><kbd>↑</kbd><kbd>↓</kbd> parent / child</span>
+      <span><kbd>Esc</kbd> stop</span>
+    </footer>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
