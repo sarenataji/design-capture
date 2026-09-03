@@ -16,7 +16,7 @@ import type {
 const out = document.querySelector<HTMLPreElement>("#out")!;
 const intent = document.querySelector<HTMLTextAreaElement>("#intent")!;
 const target = document.querySelector<HTMLSelectElement>("#target")!;
-const jobs = document.querySelector<HTMLElement>("#jobs")!;
+const jobs = document.querySelector<HTMLSelectElement>("#jobs")!;
 const jobGuideList = document.querySelector<HTMLElement>("#job-guide-list")!;
 const targetGuideList =
   document.querySelector<HTMLElement>("#target-guide-list")!;
@@ -27,7 +27,7 @@ const pick = document.querySelector<HTMLButtonElement>("#pick")!;
 const scanBtn = document.querySelector<HTMLButtonElement>("#scan")!;
 const copy = document.querySelector<HTMLButtonElement>("#copy")!;
 const copyScan = document.querySelector<HTMLButtonElement>("#copy-scan")!;
-const tabs = document.querySelector<HTMLElement>("#tabs")!;
+const tabs = document.querySelector<HTMLSelectElement>("#tabs")!;
 const status = document.querySelector<HTMLElement>("#status")!;
 const summary = document.querySelector<HTMLElement>("#summary")!;
 const sumTitle = document.querySelector<HTMLElement>("#sum-title")!;
@@ -39,6 +39,8 @@ const swatches = document.querySelector<HTMLElement>("#swatches")!;
 const scanReport = document.querySelector<HTMLElement>("#scan-report")!;
 const scanSource = document.querySelector<HTMLElement>("#scan-source")!;
 const scanRows = document.querySelector<HTMLElement>("#scan-rows")!;
+const captureSetup = document.querySelector<HTMLDetailsElement>("#capture-setup")!;
+const setupSummary = document.querySelector<HTMLElement>("#setup-summary")!;
 
 let kind: OutputKind = "photocopy";
 let job: Job = "rebuild";
@@ -50,6 +52,12 @@ let currentTabId: number | null = null;
 let currentPageUrl = "";
 
 target.innerHTML = TARGETS.map(
+  (item) => `<option value="${item.id}">${item.label}</option>`,
+).join("");
+jobs.innerHTML = JOBS.map(
+  (item) => `<option value="${item.id}">${item.label}</option>`,
+).join("");
+tabs.innerHTML = OUTPUTS.map(
   (item) => `<option value="${item.id}">${item.label}</option>`,
 ).join("");
 
@@ -145,29 +153,33 @@ async function switchPage(tabId?: number, url?: string) {
 }
 
 function syncTabs() {
-  const buttons = [
-    ...tabs.querySelectorAll("button"),
-    ...outputGuideList.querySelectorAll("button"),
-  ];
+  tabs.value = kind;
+  const buttons = [...outputGuideList.querySelectorAll("button")];
   for (const child of buttons) {
     child.classList.toggle("on", child.dataset.kind === kind);
   }
 }
 
+function syncSetupSummary() {
+  const jobLabel = jobs.selectedOptions[0]?.textContent ?? job;
+  const targetLabel = target.selectedOptions[0]?.textContent ?? target.value;
+  setupSummary.textContent = `${jobLabel} · ${targetLabel}`;
+}
+
 function syncJobs() {
-  const buttons = [
-    ...jobs.querySelectorAll("button"),
-    ...jobGuideList.querySelectorAll("button"),
-  ];
+  jobs.value = job;
+  const buttons = [...jobGuideList.querySelectorAll("button")];
   for (const child of buttons) {
     child.classList.toggle("on", child.dataset.job === job);
   }
+  syncSetupSummary();
 }
 
 function syncTarget() {
   for (const child of targetGuideList.querySelectorAll("button")) {
     child.classList.toggle("on", child.dataset.target === target.value);
   }
+  syncSetupSummary();
 }
 
 function setJob(next: Job) {
@@ -242,7 +254,7 @@ function setGuide(next: HTMLButtonElement | null) {
 function setPicking(on: boolean) {
   picking = on;
   pick.classList.toggle("on", on);
-  pick.textContent = on ? "Listening" : "Pick";
+  pick.textContent = on ? "Listening…" : "Pick element";
   scanBtn.disabled = scanning;
   scanBtn.textContent = scanning ? "Scanning" : "Scan page";
   status.textContent = scanning
@@ -322,6 +334,21 @@ function renderScan() {
     .map((v) => esc(`${v.name}: ${v.value}`))
     .join("<br>");
 
+  const stackGroups = stackByKind(scan);
+  const hasMotionLibrary = stackGroups.some((group) => group.kind === "motion");
+  const measuredMotion = capture?.motion.effects ?? [];
+  const nativeMotion = [
+    measuredMotion.some((effect) => effect.type === "css-animation")
+      ? "CSS animation"
+      : "",
+    measuredMotion.some((effect) => effect.type === "transition")
+      ? "CSS transition"
+      : "",
+    measuredMotion.some((effect) => effect.type === "web-animation")
+      ? "Web Animations API"
+      : "",
+  ].filter(Boolean);
+
   scanRows.innerHTML = [
     row(
       `Visible palette · ${scan.visualColors?.length ?? 0}`,
@@ -338,9 +365,12 @@ function renderScan() {
     row("Radius", esc(scan.radii.join(" · ")), "square corners"),
     row("Shadow", scan.shadows.map(esc).join("<br>"), "no repeating shadows"),
     row(":root vars", vars, "none exposed"),
-    ...stackByKind(scan).map((group) =>
+    ...stackGroups.map((group) =>
       row(group.label, esc(group.names.join(", ")), ""),
     ),
+    !hasMotionLibrary && nativeMotion.length
+      ? row("Motion", esc(`${nativeMotion.join(", ")} · selected element`), "")
+      : "",
     scan.detected.length
       ? ""
       : row("Stack", "", "nothing matched in scripts, DOM, CSS, or globals"),
@@ -516,10 +546,8 @@ target.addEventListener("change", () => {
   setTarget(target.value as Target);
 });
 
-jobs.addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest("button");
-  if (!button?.dataset.job) return;
-  setJob(button.dataset.job as Job);
+jobs.addEventListener("change", () => {
+  setJob(jobs.value as Job);
 });
 
 document.addEventListener("keydown", (event) => {
@@ -551,10 +579,12 @@ document.addEventListener("click", (event) => {
   if (row || (openHelp && !el.closest(".guide"))) setGuide(null);
 });
 
-tabs.addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest("button");
-  if (!button?.dataset.kind) return;
-  setKind(button.dataset.kind as OutputKind);
+tabs.addEventListener("change", () => {
+  setKind(tabs.value as OutputKind);
+});
+
+captureSetup.addEventListener("toggle", () => {
+  if (!captureSetup.open && openHelp?.closest("#capture-setup")) setGuide(null);
 });
 
 browser.storage.onChanged.addListener((changes, area) => {

@@ -12,14 +12,30 @@
         <p class="kicker" id="status">Idle</p>
         <h1>Design Capture</h1>
       </div>
-      <div class="actions">
-        <button id="pick" type="button">Pick</button>
-        <button id="scan" type="button" class="ghost">Scan page</button>
-        <button id="copy" type="button" class="ghost">Copy</button>
-      </div>
     </header>
 
-    <section class="jobs" aria-label="Job">
+    <div class="actions" aria-label="Capture actions">
+      <button id="pick" type="button">Pick element</button>
+      <button id="scan" type="button" class="ghost">Scan page</button>
+      <button id="copy" type="button" class="ghost">Copy result</button>
+    </div>
+
+    <details id="capture-setup" class="setup">
+      <summary class="setup-head">
+        <div>
+          <p class="eyebrow">Capture setup</p>
+          <h2>What should we make?</h2>
+        </div>
+        <div class="setup-status">
+          <span id="setup-summary">Rebuild · Auto (this repo)</span>
+          <span class="setup-chevron" aria-hidden="true"></span>
+        </div>
+      </summary>
+
+      <div class="setup-body">
+
+      <div class="control-grid">
+      <div class="jobs">
       <div class="field-head">
         <span>Job</span>
         <button
@@ -34,13 +50,7 @@
         </button>
       </div>
 
-      <div id="jobs" class="job-row">
-        <button type="button" data-job="rebuild" class="on">Rebuild</button>
-        <button type="button" data-job="restyle">Restyle</button>
-        <button type="button" data-job="system">System</button>
-        <button type="button" data-job="translate">Translate</button>
-        <button type="button" data-job="motion">Motion</button>
-      </div>
+      <select id="jobs" aria-label="Job"></select>
 
       <div id="job-guide" class="guide" role="dialog" aria-label="Jobs explained" hidden>
         <div class="guide-head">
@@ -53,56 +63,7 @@
         <div id="job-guide-list" class="guide-list"></div>
         <p class="guide-foot">Tap one to use it. You can change it any time.</p>
       </div>
-    </section>
-
-    <div class="intent">
-      <div class="field-head">
-        <label for="intent">Intent <em>optional</em></label>
-        <button
-          type="button"
-          class="help"
-          data-guide="intent-guide"
-          aria-label="What is intent?"
-          aria-expanded="false"
-          aria-controls="intent-guide"
-        >
-          ?
-        </button>
       </div>
-      <textarea
-        id="intent"
-        rows="3"
-        placeholder="Dark, athletic, accent on the label not the fill"
-      ></textarea>
-
-      <div
-        id="intent-guide"
-        class="guide"
-        role="dialog"
-        aria-label="Intent explained"
-        tabindex="-1"
-        hidden
-      >
-        <div class="guide-head">
-          <strong>What is intent?</strong>
-          <button type="button" class="guide-x" aria-label="Close">×</button>
-        </div>
-        <p class="guide-lede">
-          Anything you want changed, in your own words. Leave it empty to copy
-          the design as-is.
-        </p>
-        <div class="guide-list">
-          <div class="guide-row">
-            <strong>For example</strong>
-            <small>"Darker, and put the highlight on the text, not the button."</small>
-          </div>
-          <div class="guide-row">
-            <strong>If it disagrees</strong>
-            <small>Your words win over what was measured on the page.</small>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <div class="filters">
       <div class="field-head">
@@ -138,13 +99,50 @@
         <p class="guide-foot">Tap one to use it. You can change it any time.</p>
       </div>
     </div>
+      </div>
+
+    <div class="intent">
+      <div class="field-head">
+        <label for="intent">Creative direction <em>optional</em></label>
+        <button
+          type="button"
+          class="help"
+          data-guide="intent-guide"
+          aria-label="What is creative direction?"
+          aria-expanded="false"
+          aria-controls="intent-guide"
+        >
+          ?
+        </button>
+      </div>
+      <textarea id="intent" rows="3" placeholder="e.g. Dark and athletic, with a restrained pink accent"></textarea>
+
+      <div
+        id="intent-guide"
+        class="guide"
+        role="dialog"
+        aria-label="Creative direction explained"
+        tabindex="-1"
+        hidden
+      >
+        <div class="guide-head">
+          <strong>What is creative direction?</strong>
+          <button type="button" class="guide-x" aria-label="Close">×</button>
+        </div>
+        <p class="guide-lede">
+          Anything you want changed, in your own words. Leave it empty to copy the design as-is.
+        </p>
+      </div>
+    </div>
+      </div>
+    </details>
 
     <div id="scrim" class="scrim" hidden></div>
 
-    <section id="scan-report" class="scan" hidden>
-      <div class="scan-head">
+    <details id="scan-report" class="scan" hidden>
+      <summary class="scan-head">
         <div class="field-head">
-          <span>Site scan <em>detected</em></span>
+          <span>Site scan <em>ready</em></span>
           <button
             type="button"
             class="help"
@@ -156,10 +154,15 @@
             ?
           </button>
         </div>
-        <button type="button" id="copy-scan" class="ghost">Copy scan</button>
+        <span class="disclosure">View details</span>
+      </summary>
+      <div class="scan-body">
+        <div class="scan-tools">
+          <p id="scan-source" class="scan-source"></p>
+          <button type="button" id="copy-scan" class="ghost">Copy scan</button>
+        </div>
+        <div id="scan-rows" class="scan-rows"></div>
       </div>
-      <p id="scan-source" class="scan-source"></p>
-      <div id="scan-rows" class="scan-rows"></div>
 
       <div
         id="scan-guide"
@@ -207,7 +210,7 @@
           </div>
         </div>
       </div>
-    </section>
+    </details>
 
     <section id="summary" class="summary empty" hidden>
       <div>
@@ -250,7 +253,7 @@
       </div>
     </section>
 
-    <section class="outputs">
+    <section class="outputs result-panel">
       <div class="field-head">
         <span>Output</span>
         <button
@@ -265,14 +268,7 @@
         </button>
       </div>
 
-      <nav class="tabs" id="tabs" aria-label="Output format">
-        <button type="button" data-kind="photocopy" class="on">Photocopy</button>
-        <button type="button" data-kind="prompt">Prompt</button>
-        <button type="button" data-kind="design-md">DESIGN.md</button>
-        <button type="button" data-kind="skill-md">SKILL.md</button>
-        <button type="button" data-kind="css">CSS</button>
-        <button type="button" data-kind="tailwind">Tailwind</button>
-      </nav>
+      <select id="tabs" aria-label="Output format"></select>
 
       <div
         id="output-guide"
@@ -293,7 +289,7 @@
       </div>
     </section>
 
-    <pre id="out">Alt+Shift+D · hover reads facts (no AI) · click locks the element and fills this panel · ↵ copies. Photocopy is the spec. Prompt wraps it with Job + Intent.</pre>
+    <pre id="out">Pick reads one element. Scan page reads the whole site. Click to lock what you hover.</pre>
 
     <footer>
       <span><kbd>⌥⇧D</kbd> picker</span>
