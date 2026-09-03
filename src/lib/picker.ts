@@ -1,4 +1,5 @@
 import { captureElement, hoverPreview } from "./capture";
+import { cssColorToHex } from "./color";
 import { readStyles } from "./css";
 import { outputLabel, renderOutput } from "./prompt";
 import { STORAGE_KEYS } from "./storage";
@@ -35,6 +36,7 @@ function frames(n: number): Promise<void> {
 export function createPicker(options: PickerOptions) {
   let active = false;
   let locked = false;
+  let expanded = false;
   let current: Element | null = null;
   let host: HTMLElement | null = null;
   let shadow: ShadowRoot | null = null;
@@ -67,24 +69,70 @@ export function createPicker(options: PickerOptions) {
           border-style: dashed;
           background: rgba(255, 184, 212, 0.16);
         }
-        .tip.locked { box-shadow: 0 0 0 1.5px #ffb8d4, 0 12px 32px rgba(0,0,0,0.45); }
-        .tip .lock { margin-top: 6px; color: #ffb8d4; letter-spacing: 0.08em; }
         .tip {
           position: absolute;
-          max-width: 360px;
-          padding: 8px 10px;
+          width: 288px;
           background: #0f110c;
           color: #f4f6ef;
-          font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+          font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
           box-shadow: 0 12px 32px rgba(0,0,0,0.45);
         }
-        .tip b { color: #ffb8d4; font-weight: 650; }
-        .tip .sel { color: #9aa392; word-break: break-all; margin-top: 4px; }
-        .swatches { display: flex; gap: 4px; margin-top: 6px; }
-        .swatch {
-          width: 12px; height: 12px;
-          border: 1px solid rgba(255,255,255,0.2);
+        .tip.locked { box-shadow: 0 0 0 1.5px #ffb8d4, 0 12px 32px rgba(0,0,0,0.45); }
+        .head {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 10px;
         }
+        .tag {
+          color: #ffb8d4;
+          font-weight: 650;
+        }
+        .dim { color: #f4f6ef; }
+        .head .swatches { margin-left: auto; }
+        .swatches { display: flex; gap: 3px; }
+        .swatch {
+          width: 11px; height: 11px;
+          border: 1px solid rgba(255,255,255,0.22);
+        }
+        .rows { border-top: 1px solid #232a1f; padding: 6px 10px 7px; }
+        .row {
+          display: grid;
+          grid-template-columns: 46px 1fr;
+          gap: 8px;
+          padding: 1px 0;
+        }
+        .row dt {
+          color: #6f7a66;
+          font-size: 9px;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          line-height: 1.7;
+        }
+        .row dd { margin: 0; }
+        .row dd span { color: #6f7a66; }
+        .path {
+          border-top: 1px solid #232a1f;
+          padding: 6px 10px 7px;
+          color: #9aa392;
+          word-break: break-all;
+        }
+        .path em { color: #f4f6ef; font-style: normal; }
+        .path.one {
+          display: -webkit-box;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
+          overflow: hidden;
+        }
+        .hint {
+          border-top: 1px solid #232a1f;
+          padding: 6px 10px;
+          color: #6f7a66;
+          font-size: 9px;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+        }
+        .hint.on { color: #ffb8d4; }
         .dock {
           pointer-events: auto;
           position: fixed;
@@ -152,6 +200,7 @@ export function createPicker(options: PickerOptions) {
           <div class="brand"><b>CAPTURE</b><span>INSPECT</span></div>
           <button type="button" data-act="parent">Parent <kbd>↑</kbd></button>
           <button type="button" data-act="child">Child <kbd>↓</kbd></button>
+          <button type="button" data-act="specs">Specs <kbd>⇥</kbd></button>
           <button type="button" class="primary" data-act="capture">Capture <kbd>↵</kbd></button>
           <button type="button" data-act="stop">Esc</button>
         </div>
@@ -166,6 +215,10 @@ export function createPicker(options: PickerOptions) {
       const act = (event.target as HTMLElement).closest("button")?.dataset.act;
       if (act === "parent") walk("parent");
       if (act === "child") walk("child");
+      if (act === "specs") {
+        expanded = !expanded;
+        paint();
+      }
       if (act === "capture" && current) void commit(current);
       if (act === "stop") stop();
     });
@@ -198,20 +251,9 @@ export function createPicker(options: PickerOptions) {
     liveStyles = readStyles(current);
     const preview = hoverPreview(current);
     tip.hidden = false;
-    tip.innerHTML = `
-      <b>${escapeHtml(preview.tag)}</b> ${preview.width}×${preview.height}
-      <br>${escapeHtml(preview.fontFamily)} · ${escapeHtml(preview.fontWeight)} · ${escapeHtml(preview.fontSize)} / ${escapeHtml(preview.lineHeight)} · ls ${escapeHtml(preview.letterSpacing)}
-      <br>${escapeHtml(preview.color)} · bg ${escapeHtml(preview.background)}
-      <br>r ${escapeHtml(preview.radius)} · p ${escapeHtml(preview.padding)} · gap ${escapeHtml(preview.gap)}
-      <div class="sel">${escapeHtml(preview.selector)}</div>
-      <div class="swatches">
-        <span class="swatch" style="background:${preview.color}"></span>
-        <span class="swatch" style="background:${preview.background}"></span>
-      </div>
-      ${locked ? `<div class="lock">LOCKED · ↵ capture · click to release</div>` : ""}
-    `;
+    tip.innerHTML = tipHtml(preview, { locked, expanded });
 
-    const tipWidth = 340;
+    const tipWidth = 288;
     const left = Math.min(
       Math.max(8, rect.left),
       window.innerWidth - tipWidth - 8,
@@ -265,6 +307,7 @@ export function createPicker(options: PickerOptions) {
 
   function setLocked(next: boolean) {
     locked = next;
+    if (next) expanded = true;
     paint();
     if (next) toast("Locked — ↵ capture, click to release");
   }
@@ -275,6 +318,12 @@ export function createPicker(options: PickerOptions) {
       event.preventDefault();
       if (locked) setLocked(false);
       else stop();
+      return;
+    }
+    if (event.key === "Tab") {
+      event.preventDefault();
+      expanded = !expanded;
+      paint();
       return;
     }
     if (event.key === "ArrowUp") {
@@ -338,6 +387,7 @@ export function createPicker(options: PickerOptions) {
     if (!active && !host) return;
     setActive(false);
     locked = false;
+    expanded = false;
     document.removeEventListener("mousemove", onMove, true);
     document.removeEventListener("pointerdown", onPointer, true);
     document.removeEventListener("click", onPointer, true);
@@ -360,6 +410,65 @@ export function createPicker(options: PickerOptions) {
   }
 
   return { start, stop, toggle, isActive: () => active, toast };
+}
+
+type Preview = ReturnType<typeof hoverPreview>;
+
+function tipHtml(
+  preview: Preview,
+  state: { locked: boolean; expanded: boolean },
+) {
+  const head = `
+    <div class="head">
+      <span class="tag">${escapeHtml(preview.tag)}</span>
+      <span class="dim">${preview.width} × ${preview.height}</span>
+      <span class="swatches">
+        <span class="swatch" style="background:${preview.color}"></span>
+        <span class="swatch" style="background:${preview.background}"></span>
+      </span>
+    </div>`;
+
+  const hint = state.locked
+    ? `<div class="hint on">Locked · ↵ capture · click to release</div>`
+    : `<div class="hint">${state.expanded ? "Tab hide specs" : "Tab specs"} · click lock</div>`;
+
+  if (!state.expanded) return `${head}${selectorHtml(preview.selector, true)}${hint}`;
+
+  const rows = [
+    ["type", `${preview.fontFamily} <span>·</span> ${preview.fontWeight}`],
+    [
+      "text",
+      `${trim(preview.fontSize)}<span>/</span>${trim(preview.lineHeight)} <span>·</span> ls ${trim(preview.letterSpacing)}`,
+    ],
+    ["fill", `${swatchValue(preview.color)} <span>on</span> ${swatchValue(preview.background)}`],
+    [
+      "box",
+      `r ${trim(preview.radius)} <span>·</span> p ${trim(preview.padding)}${preview.gap && preview.gap !== "normal" ? ` <span>·</span> gap ${trim(preview.gap)}` : ""}`,
+    ],
+  ];
+
+  const body = rows
+    .map(([label, value]) => `<dl class="row"><dt>${label}</dt><dd>${value}</dd></dl>`)
+    .join("");
+
+  return `${head}<div class="rows">${body}</div>${selectorHtml(preview.selector, false)}${hint}`;
+}
+
+function selectorHtml(selector: string, compact: boolean) {
+  const parts = selector.split(" > ");
+  const last = escapeHtml(parts.at(-1) ?? selector);
+  if (compact)
+    return `<div class="path one">${parts.length > 1 ? "… › " : ""}<em>${last}</em></div>`;
+  const head = parts.slice(0, -1).map(escapeHtml).join(" ›&#8203; ");
+  return `<div class="path">${head ? `${head} ›&#8203; ` : ""}<em>${last}</em></div>`;
+}
+
+function swatchValue(color: string) {
+  return `${escapeHtml(cssColorToHex(color) ?? color)}`;
+}
+
+function trim(value: string) {
+  return value.replaceAll("px", "");
 }
 
 function escapeHtml(value: string) {
