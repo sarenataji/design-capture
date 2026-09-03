@@ -5,20 +5,31 @@ export type Target =
   | "tailwind"
   | "html";
 
-/** How the agent should use the capture. This is the quality lever. */
-export type Direction =
+/** Five canned jobs. The button writes the job sentence. */
+export type Job =
   | "rebuild"
   | "restyle"
   | "system"
   | "translate"
   | "motion";
 
+/** @deprecated use Job */
+export type Direction = Job;
+
 export type OutputKind =
+  | "photocopy"
   | "prompt"
   | "design-md"
   | "skill-md"
   | "css"
   | "tailwind";
+
+export type MeasuredFlags = {
+  hover: boolean;
+  focus: boolean;
+  active: boolean;
+  motion: boolean;
+};
 
 export type Box = {
   x: number;
@@ -76,6 +87,50 @@ export type ContrastPair = {
   aaa: boolean;
 };
 
+export type ColorRole = "bg" | "text" | "accent" | "border";
+
+export type ScanColor = {
+  value: string;
+  role: ColorRole;
+  count: number;
+};
+
+export type ScanTypeface = {
+  family: string;
+  weights: string[];
+  sizes: string[];
+};
+
+export type DetectedKind = "framework" | "styling" | "motion" | "3d" | "cms";
+
+export type DetectedLib = {
+  name: string;
+  kind: DetectedKind;
+  via: "script" | "dom" | "css" | "class";
+};
+
+export type PageScan = {
+  url: string;
+  title: string;
+  scannedAt: string;
+  viewport: { width: number; height: number };
+  colors: ScanColor[];
+  fonts: ScanTypeface[];
+  spacing: string[];
+  radii: string[];
+  shadows: string[];
+  cssVariables: { name: string; value: string }[];
+  detected: DetectedLib[];
+};
+
+export type CaptureOptions = {
+  intent?: string;
+  target?: Target;
+  job?: Job;
+  /** Computed styles while the pointer was over the node (may include :hover). */
+  liveStyles?: StyleMap;
+};
+
 export type CaptureResult = {
   url: string;
   title: string;
@@ -85,10 +140,16 @@ export type CaptureResult = {
   node: NodeCapture;
   html: string;
   motion: MotionCapture;
+  measured: MeasuredFlags;
+  /** Tokens from the selected component only. */
   tokens: TokenCapture;
+  /** Page-level tokens. Secondary — for Prompt / System, not a button photocopy. */
+  pageTokens: TokenCapture;
   assets: AssetCapture[];
   contrast: ContrastPair[];
   intent: string;
   target: Target;
-  direction: Direction;
+  job: Job;
+  /** @deprecated use job */
+  direction: Job;
 };

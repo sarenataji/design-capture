@@ -1,6 +1,15 @@
 import { captureElement, hoverPreview } from "./capture";
+import { readStyles } from "./css";
+import { outputLabel, renderOutput } from "./prompt";
 import { STORAGE_KEYS } from "./storage";
-import type { CaptureResult, Direction, Target } from "./types";
+import type {
+  CaptureResult,
+  Job,
+  OutputKind,
+  PageScan,
+  StyleMap,
+  Target,
+} from "./types";
 
 const HOST_ID = "design-capture-root";
 
@@ -8,8 +17,20 @@ type PickerOptions = {
   onCapture: (result: CaptureResult) => void;
   getTarget: () => Target;
   getIntent: () => string;
-  getDirection: () => Direction;
+  getJob: () => Job;
+  getOutputKind: () => OutputKind;
+  getScan: () => PageScan | null;
 };
+
+function frames(n: number): Promise<void> {
+  return new Promise((resolve) => {
+    const step = (left: number) => {
+      if (left <= 0) resolve();
+      else requestAnimationFrame(() => step(left - 1));
+    };
+    step(n);
+  });
+}
 
 export function createPicker(options: PickerOptions) {
   let active = false;
@@ -18,8 +39,10 @@ export function createPicker(options: PickerOptions) {
   let shadow: ShadowRoot | null = null;
   let box: HTMLDivElement | null = null;
   let tip: HTMLDivElement | null = null;
+  let overlay: HTMLDivElement | null = null;
   let toastEl: HTMLDivElement | null = null;
   let toastTimer = 0;
+  let liveStyles: StyleMap = {};
 
   function ensureUi() {
     if (host && document.documentElement.contains(host)) return;
@@ -32,6 +55,7 @@ export function createPicker(options: PickerOptions) {
         :host { all: initial; }
         * { box-sizing: border-box; }
         .overlay { position: fixed; inset: 0; pointer-events: none; z-index: 2147483646; }
+        .overlay.shield { pointer-events: auto; }
         .box {
           position: absolute;
           border: 1.5px solid #d6ff3f;
@@ -40,7 +64,7 @@ export function createPicker(options: PickerOptions) {
         }
         .tip {
           position: absolute;
-          max-width: 340px;
+          max-width: 360px;
           padding: 8px 10px;
           background: #0f110c;
           color: #f4f6ef;
@@ -48,6 +72,7 @@ export function createPicker(options: PickerOptions) {
           box-shadow: 0 12px 32px rgba(0,0,0,0.45);
         }
         .tip b { color: #d6ff3f; font-weight: 650; }
+        .tip .sel { color: #9aa392; word-break: break-all; margin-top: 4px; }
         .swatches { display: flex; gap: 4px; margin-top: 6px; }
         .swatch {
           width: 12px; height: 12px;
@@ -117,7 +142,7 @@ export function createPicker(options: PickerOptions) {
         <div class="box" hidden></div>
         <div class="tip" hidden></div>
         <div class="dock">
-          <div class="brand"><b>CAPTURE</b><span>LIVE</span></div>
+          <div class="brand"><b>CAPTURE</b><span>INSPECT</span></div>
           <button type="button" data-act="parent">Parent <kbd>↑</kbd></button>
           <button type="button" data-act="child">Child <kbd>↓</kbd></button>
           <button type="button" class="primary" data-act="capture">Capture <kbd>↵</kbd></button>
@@ -126,6 +151,7 @@ export function createPicker(options: PickerOptions) {
         <div class="toast"></div>
       </div>
     `;
+    overlay = shadow.querySelector(".overlay");
     box = shadow.querySelector(".box");
     tip = shadow.querySelector(".tip");
     toastEl = shadow.querySelector(".toast");
@@ -133,7 +159,7 @@ export function createPicker(options: PickerOptions) {
       const act = (event.target as HTMLElement).closest("button")?.dataset.act;
       if (act === "parent") walk("parent");
       if (act === "child") walk("child");
-      if (act === "capture" && current) commit(current);
+      if (act === "capture" && current) void commit(current);
       if (act === "stop") stop();
     });
     document.documentElement.appendChild(host);
@@ -160,21 +186,24 @@ export function createPicker(options: PickerOptions) {
       height: `${rect.height}px`,
     });
 
+    liveStyles = readStyles(current);
     const preview = hoverPreview(current);
     tip.hidden = false;
-    const tipWidth = 320;
+    const tipWidth = 340;
     const left = Math.min(
       Math.max(8, rect.left),
       window.innerWidth - tipWidth - 8,
     );
-    const preferAbove = rect.top > 88;
+    const preferAbove = rect.top > 120;
     const top = preferAbove ? rect.top - 8 : rect.bottom + 8;
     tip.style.left = `${left}px`;
-    tip.style.top = preferAbove ? `${Math.max(8, top - 76)}px` : `${top}px`;
+    tip.style.top = preferAbove ? `${Math.max(8, top - 108)}px` : `${top}px`;
     tip.innerHTML = `
       <b>${escapeHtml(preview.tag)}</b> ${preview.width}×${preview.height}
-      <br>${escapeHtml(preview.font)}
-      <br>${escapeHtml(preview.color)} · radius ${escapeHtml(preview.radius)}
+      <br>${escapeHtml(preview.fontFamily)} · ${escapeHtml(preview.fontWeight)} · ${escapeHtml(preview.fontSize)} / ${escapeHtml(preview.lineHeight)} · ls ${escapeHtml(preview.letterSpacing)}
+      <br>${escapeHtml(preview.color)} · bg ${escapeHtml(preview.background)}
+      <br>r ${escapeHtml(preview.radius)} · p ${escapeHtml(preview.padding)} · gap ${escapeHtml(preview.gap)}
+      <div class="sel">${escapeHtml(preview.selector)}</div>
       <div class="swatches">
         <span class="swatch" style="background:${preview.color}"></span>
         <span class="swatch" style="background:${preview.background}"></span>
@@ -211,7 +240,7 @@ export function createPicker(options: PickerOptions) {
     event.stopImmediatePropagation();
     if (event.type !== "pointerdown") return;
     const el = current || deepFromPoint(event.clientX, event.clientY);
-    if (el) commit(el);
+    if (el) void commit(el);
   }
 
   function onKey(event: KeyboardEvent) {
@@ -231,18 +260,26 @@ export function createPicker(options: PickerOptions) {
     }
     if (event.key === "Enter" && current) {
       event.preventDefault();
-      commit(current);
+      void commit(current);
     }
   }
 
-  function commit(el: Element) {
+  async function commit(el: Element) {
+    const hovered = liveStyles;
+    overlay?.classList.add("shield");
+    await frames(2);
+    const kind = options.getOutputKind();
     const result = captureElement(el, {
       target: options.getTarget(),
       intent: options.getIntent(),
-      direction: options.getDirection(),
+      job: options.getJob(),
+      liveStyles: hovered,
     });
+    overlay?.classList.remove("shield");
+    const text = renderOutput(kind, result, options.getScan());
+    void navigator.clipboard.writeText(text).catch(() => {});
     options.onCapture(result);
-    toast("Prompt copied");
+    toast(`${outputLabel(kind)} copied`);
     stop();
   }
 
@@ -267,7 +304,7 @@ export function createPicker(options: PickerOptions) {
     document.addEventListener("pointerdown", onPointer, true);
     document.addEventListener("click", onPointer, true);
     document.addEventListener("keydown", onKey, true);
-    toast("Hover, then click");
+    toast("Hover — inspect. Click — capture.");
   }
 
   function stop() {
@@ -282,8 +319,10 @@ export function createPicker(options: PickerOptions) {
     shadow = null;
     box = null;
     tip = null;
+    overlay = null;
     toastEl = null;
     current = null;
+    liveStyles = {};
   }
 
   function toggle() {

@@ -1,24 +1,47 @@
 import { captureAssets, sanitizeHtml } from "./assets";
-import { baselineForTag, diffStyles, readStyles } from "./css";
+import { baselineForTag, changedStyles, diffStyles, readStyles } from "./css";
 import { cssSelector, visibleText } from "./selector";
 import { captureMotion, captureStates } from "./states";
 import { captureContrast, captureTokens } from "./tokens";
-import type { CaptureResult, Direction, NodeCapture, Target } from "./types";
+import type {
+  CaptureOptions,
+  CaptureResult,
+  Job,
+  NodeCapture,
+  StyleMap,
+} from "./types";
 
 const CHILD_LIMIT = 8;
 const DEPTH_LIMIT = 3;
 
-function captureNode(el: Element, depth: number): NodeCapture {
+function hasMap(styles: StyleMap): boolean {
+  return Object.keys(styles).length > 0;
+}
+
+function mergeStates(cssom: StyleMap, liveDiff: StyleMap): StyleMap {
+  return { ...cssom, ...liveDiff };
+}
+
+function captureNode(
+  el: Element,
+  depth: number,
+  liveRaw: StyleMap,
+): NodeCapture {
   const rect = el.getBoundingClientRect();
   const states = captureStates(el);
-  const styles = diffStyles(readStyles(el), baselineForTag(el.tagName.toLowerCase()));
+  const restRaw = readStyles(el);
+  const rest = diffStyles(restRaw, baselineForTag(el.tagName.toLowerCase()));
+  const hover = mergeStates(
+    states.hover,
+    depth === 0 && hasMap(liveRaw) ? changedStyles(liveRaw, restRaw) : {},
+  );
   const children: NodeCapture[] = [];
   if (depth < DEPTH_LIMIT) {
     const kids = Array.from(el.children).slice(0, CHILD_LIMIT);
     for (const child of kids) {
       const box = child.getBoundingClientRect();
       if (box.width < 2 && box.height < 2) continue;
-      children.push(captureNode(child, depth + 1));
+      children.push(captureNode(child, depth + 1, {}));
     }
   }
 
@@ -35,8 +58,8 @@ function captureNode(el: Element, depth: number): NodeCapture {
       width: Math.round(rect.width),
       height: Math.round(rect.height),
     },
-    styles,
-    hover: states.hover,
+    styles: rest,
+    hover: hasMap(hover) ? hover : {},
     focus: states.focus,
     active: states.active,
     children,
@@ -45,9 +68,12 @@ function captureNode(el: Element, depth: number): NodeCapture {
 
 export function captureElement(
   el: Element,
-  options: { intent?: string; target?: Target; direction?: Direction } = {},
+  options: CaptureOptions = {},
 ): CaptureResult {
-  const node = captureNode(el, 0);
+  const job: Job = options.job ?? "rebuild";
+  const live = options.liveStyles ?? {};
+  const node = captureNode(el, 0, live);
+  const motion = captureMotion(el);
   return {
     url: location.href,
     title: document.title,
@@ -56,27 +82,48 @@ export function captureElement(
     selector: node.selector,
     node,
     html: sanitizeHtml(el),
-    motion: captureMotion(el),
-    tokens: captureTokens(),
+    motion,
+    measured: {
+      hover: hasMap(node.hover),
+      focus: hasMap(node.focus),
+      active: hasMap(node.active),
+      motion:
+        motion.transitions.length > 0 ||
+        motion.animations.length > 0 ||
+        motion.keyframes.length > 0,
+    },
+    tokens: captureTokens(el),
+    pageTokens: captureTokens(),
     assets: captureAssets(el),
     contrast: captureContrast(el),
     intent: options.intent ?? "",
     target: options.target ?? "auto",
-    direction: options.direction ?? "rebuild",
+    job,
+    direction: job,
   };
 }
 
 export function hoverPreview(el: Element) {
   const style = getComputedStyle(el);
   const rect = el.getBoundingClientRect();
+  const family = style.fontFamily
+    .split(",")[0]
+    ?.replace(/['"]/g, "")
+    .trim();
   return {
     tag: el.tagName.toLowerCase(),
     selector: cssSelector(el),
     width: Math.round(rect.width),
     height: Math.round(rect.height),
-    font: `${style.fontWeight} ${style.fontSize}/${style.lineHeight} ${style.fontFamily.split(",")[0]?.replace(/['"]/g, "")}`,
+    fontFamily: family || "unknown",
+    fontWeight: style.fontWeight,
+    fontSize: style.fontSize,
+    lineHeight: style.lineHeight,
+    letterSpacing: style.letterSpacing,
     color: style.color,
     background: style.backgroundColor,
     radius: style.borderRadius,
+    padding: style.padding,
+    gap: style.gap,
   };
 }

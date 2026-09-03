@@ -15,16 +15,16 @@ html, body {
   height: 100%;
   background: var(--bg);
   color: var(--ink);
-  font: 13px/1.45 "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  font: 13px/1.45 ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
   display: grid;
-  grid-template-rows: auto auto auto auto auto 1fr auto;
+  grid-template-rows: auto auto auto auto auto auto auto 1fr auto;
   min-height: 100%;
 }
 
-.top, .intent, .filters, .summary, .tabs, pre, footer {
+.top, .jobs, .intent, .filters, .scan, .tabs, pre, footer {
   padding-left: 14px;
   padding-right: 14px;
 }
@@ -42,9 +42,9 @@ body {
 .kicker {
   margin: 0 0 4px;
   font-size: 10px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--muted);
 }
 
 .kicker.live { color: var(--accent); }
@@ -58,8 +58,16 @@ h1 {
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
   flex-shrink: 0;
+  max-width: 58%;
+}
+
+.actions button {
+  padding: 7px 9px;
+  font-size: 12px;
 }
 
 button, select, textarea {
@@ -89,13 +97,13 @@ button {
 
 .ghost { background: transparent; }
 
-.intent, .filters {
+.jobs, .intent, .filters {
   display: grid;
   gap: 6px;
   padding-top: 12px;
 }
 
-.intent span, .filters span {
+.jobs span, .intent span, .filters span {
   color: var(--muted);
   font-size: 11px;
 }
@@ -105,20 +113,31 @@ button {
   opacity: 0.7;
 }
 
-.filters {
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+.job-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.job-row button {
+  padding: 6px 8px;
+  font-size: 11px;
+}
+
+.job-row button.on {
+  background: var(--accent);
+  color: #11140c;
+  border-color: var(--accent);
+  font-weight: 650;
 }
 
 label { display: grid; gap: 6px; }
 
-textarea, select, pre {
-  width: 100%;
-}
+textarea, select, pre { width: 100%; }
 
 textarea {
   resize: vertical;
-  min-height: 72px;
+  min-height: 64px;
   padding: 10px;
   background: var(--card);
 }
@@ -127,6 +146,91 @@ select {
   height: 34px;
   padding: 0 8px;
 }
+
+.scan {
+  margin: 12px 0 0;
+  padding-top: 12px;
+  padding-bottom: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.scan[hidden] { display: none; }
+
+.scan-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.scan-head span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.scan-head em {
+  font-style: normal;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 9px;
+  margin-left: 6px;
+}
+
+.scan-head button {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.scan-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 7px;
+  cursor: pointer;
+}
+
+.chip i {
+  width: 12px;
+  height: 12px;
+  display: block;
+  border: 1px solid rgba(255,255,255,0.15);
+  flex-shrink: 0;
+}
+
+.chip span {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.chip code {
+  font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.chip.copied {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.scan-line {
+  margin: 0 0 4px;
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.scan-line[hidden] { display: none; }
 
 .summary {
   display: flex;
@@ -168,20 +272,21 @@ select {
 
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 0;
-  padding-top: 12px;
+  padding-top: 10px;
   border-bottom: 1px solid var(--line);
 }
 
 .tabs button {
-  flex: 1;
+  flex: 1 1 30%;
   padding: 8px 4px;
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--muted);
-  font-size: 10px;
-  letter-spacing: 0.06em;
+  font-size: 9px;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -199,7 +304,6 @@ pre {
   white-space: pre-wrap;
   background: transparent;
   border: 0;
-  border-radius: 0;
   color: var(--ink);
   font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
 }

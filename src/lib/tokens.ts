@@ -1,4 +1,5 @@
-import { contrastRatio, cssColorToHex, isEmptyValue } from "./css";
+import { cssColorToHex, contrastRatio } from "./color";
+import { isEmptyValue } from "./css";
 import type { ContrastPair, TokenCapture } from "./types";
 
 const SKIP = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "META", "LINK", "HEAD"]);
@@ -19,14 +20,14 @@ function walkVisible(limit = 500): Element[] {
 }
 
 function roleForColor(prop: string): string {
-  if (prop.includes("background")) return "background";
+  if (prop.includes("background")) return "bg";
   if (prop === "color") return "text";
   if (prop.includes("border")) return "border";
   if (prop.includes("shadow")) return "shadow";
   return "other";
 }
 
-export function captureTokens(): TokenCapture {
+export function captureTokens(scope?: Element): TokenCapture {
   const colors = new Map<
     string,
     { value: string; count: number; roles: string[] }
@@ -39,7 +40,13 @@ export function captureTokens(): TokenCapture {
   const radii = new Set<string>();
   const shadows = new Set<string>();
 
-  for (const el of walkVisible()) {
+  const elements = scope
+    ? [scope, ...Array.from(scope.querySelectorAll("*"))].filter(
+        (el) => el instanceof Element,
+      )
+    : walkVisible();
+
+  for (const el of elements) {
     const style = getComputedStyle(el);
     for (const prop of ["color", "background-color", "border-color"] as const) {
       const hex = cssColorToHex(style.getPropertyValue(prop));
@@ -77,24 +84,28 @@ export function captureTokens(): TokenCapture {
   }
 
   const cssVariables: { name: string; value: string }[] = [];
-  const root = getComputedStyle(document.documentElement);
-  for (const sheet of Array.from(document.styleSheets)) {
-    try {
-      for (const rule of Array.from(sheet.cssRules)) {
-        if (!(rule instanceof CSSStyleRule)) continue;
-        if (!rule.selectorText.includes(":root") && rule.selectorText !== "html") {
-          continue;
+  if (!scope) {
+    const root = getComputedStyle(document.documentElement);
+    for (const sheet of Array.from(document.styleSheets)) {
+      try {
+        for (const rule of Array.from(sheet.cssRules)) {
+          if (!(rule instanceof CSSStyleRule)) continue;
+          if (!rule.selectorText.includes(":root") && rule.selectorText !== "html") {
+            continue;
+          }
+          for (const name of Array.from(rule.style)) {
+            if (!name.startsWith("--")) continue;
+            cssVariables.push({
+              name,
+              value:
+                root.getPropertyValue(name).trim() ||
+                rule.style.getPropertyValue(name),
+            });
+          }
         }
-        for (const name of Array.from(rule.style)) {
-          if (!name.startsWith("--")) continue;
-          cssVariables.push({
-            name,
-            value: root.getPropertyValue(name).trim() || rule.style.getPropertyValue(name),
-          });
-        }
+      } catch {
+        /* cross-origin sheet */
       }
-    } catch {
-      /* cross-origin sheet */
     }
   }
 

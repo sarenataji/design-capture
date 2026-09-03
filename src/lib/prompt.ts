@@ -1,9 +1,14 @@
+import { cssColorToHex } from "./color";
+import { jobSentence } from "./jobs";
+import { scanToTokenBlock, toScanMd } from "./scan-report";
 import type {
   CaptureResult,
-  Direction,
+  Job,
   NodeCapture,
   OutputKind,
+  PageScan,
   StyleMap,
+  TokenCapture,
 } from "./types";
 
 function stylesBlock(title: string, styles: StyleMap): string {
@@ -46,156 +51,259 @@ function hasMap(styles: StyleMap): boolean {
   return Object.keys(styles).length > 0;
 }
 
-function measuredNotes(capture: CaptureResult): string {
-  const missing: string[] = [];
-  if (!hasMap(capture.node.hover)) {
-    missing.push("Hover styles were not in the stylesheets. Do not invent a hover look.");
-  }
-  if (!hasMap(capture.node.focus)) {
-    missing.push("Focus styles were not observed. Add a visible focus ring that matches the accent, do not skip accessibility.");
-  }
-  if (!capture.motion.animations.length && !capture.motion.transitions.length) {
-    missing.push("No motion was observed. Keep the rebuild still unless intent asks otherwise.");
-  }
-  if (!capture.tokens.cssVariables.length) {
-    missing.push("No CSS variables on :root. Treat listed colors as a palette, name them by role, do not keep hex scattered in components.");
-  }
-  return missing.map((line) => `- ${line}`).join("\n") || "- All core layers were observed.";
+function stateLine(label: string, measured: boolean): string {
+  return measured
+    ? `- **${label}:** measured`
+    : `- **${label}:** not measured — don't invent`;
 }
 
-const DIRECTION_JOB: Record<Direction, string> = {
-  rebuild:
-    "Rebuild this one pattern in our product. Translate the design language. Do not photocopy the source site.",
-  restyle:
-    "Keep our product's information and components. Absorb this capture as visual direction (type, color roles, density, radius, motion).",
-  system:
-    "Do not build a page. Produce a DESIGN.md the rest of the project can follow. Tokens first, then rules, then anti-patterns.",
-  translate:
-    "Translate this pattern into the target stack. Preserve hierarchy, rhythm, and contrast. Drop web-only tricks that have no native equivalent.",
-  motion:
-    "Keep the current layout. Recreate only interaction and motion: hover, focus, active, transition, keyframes, stagger.",
+const EMPTY_TOKENS: TokenCapture = {
+  colors: [],
+  fonts: [],
+  spacing: [],
+  radii: [],
+  shadows: [],
+  cssVariables: [],
 };
 
-const DIRECTION_ORDER: Record<Direction, string> = {
-  rebuild: `1. Color roles and type scale
-2. Structure and spacing
-3. Radius, shadow, density
-4. States and motion
-5. Copy voice last — replace source marketing text with our product`,
-  restyle: `1. Map captured colors onto our existing tokens (do not duplicate palettes)
-2. Type scale and weight
-3. Density (padding, gap, radius)
-4. Motion if it improves clarity
-5. Leave our IA and copy unless intent says otherwise`,
-  system: `1. Palette with roles (bg, ink, accent, border, muted)
-2. Type ramp
-3. Spacing and radius ladder
-4. Shadow / depth
-5. Do / don't
-6. One example component, not a full UI`,
-  translate: `1. Hierarchy and grouping
-2. Contrast and type
-3. Spacing rhythm
-4. Platform-native controls
-5. Motion only if the platform can do it well`,
-  motion: `1. Resting state as ground truth
-2. Hover / focus / active diffs
-3. Timing, easing, delay, stagger
-4. Reduced-motion fallback`,
-};
-
-function qualityBar(capture: CaptureResult): string {
-  return `## Definition of done
-A pass looks like a designed product, not an AI default.
-- One accent. Identity color sits on labels/content, not on every surface.
-- Type hierarchy is obvious at a glance (display / title / body / meta).
-- Spacing is a ladder, not random 13px / 17px values. Snap to 4 or 8.
-- Radius is consistent across the component.
-- Contrast holds for body text (captured pair: ${
-    capture.contrast[0]
-      ? `${capture.contrast[0].fg} on ${capture.contrast[0].bg} ${capture.contrast[0].ratio}:1 ${capture.contrast[0].aa ? "AA" : "below AA — fix"}`
-      : "not measured — check"
-  }).
-- States exist: rest + at least focus. Hover only if measured or native-appropriate.
-- No Inter-on-white, no purple gradient buttons, no colored dots as identity, no fake glass on every card.
-
-## Refuse
-- Cloning logos, mascots, product names, or illustrations from the source.
-- Building the whole website. This is one pattern.
-- Inventing tokens that fight the project's existing design system.
-- Decorative animation that was not in the capture (unless direction is motion and intent asks).`;
+function tokensFor(capture: CaptureResult): TokenCapture {
+  if (resolveJob(capture) === "system") {
+    return capture.pageTokens ?? capture.tokens ?? EMPTY_TOKENS;
+  }
+  return capture.tokens ?? EMPTY_TOKENS;
 }
 
-export function toPrompt(capture: CaptureResult): string {
-  const direction = capture.direction ?? "rebuild";
-  const hover = stylesBlock(`${capture.node.tag}:hover`, capture.node.hover);
-  const focus = stylesBlock(`${capture.node.tag}:focus`, capture.node.focus);
-  const active = stylesBlock(`${capture.node.tag}:active`, capture.node.active);
-  const rest = stylesBlock(capture.node.tag, capture.node.styles);
-  const motion = [
-    ...capture.motion.transitions.map((t) => `transition: ${t}`),
-    ...capture.motion.animations.map((a) => `animation: ${a}`),
-    ...capture.motion.keyframes.map((k) => k.css),
-  ].join("\n");
-
-  const colors = capture.tokens.colors
-    .slice(0, 10)
-    .map((c) => `- ${c.value} · ${c.roles.join(", ")} · seen ${c.count}×`)
+function formatTokens(tokens: TokenCapture): string {
+  const colors = tokens.colors
+    .slice(0, 12)
+    .map((c) => `- ${c.value} · ${c.roles.join(", ") || "other"} · seen ${c.count}×`)
     .join("\n");
-  const fonts = capture.tokens.fonts
+  const fonts = tokens.fonts
     .map(
       (f) =>
         `- ${f.family} · weights ${f.weights.join("/")} · ${f.sizes.join(", ")}`,
     )
     .join("\n");
-
-  return [
-    `# Job
-${DIRECTION_JOB[direction]}
-${targetHint(capture)}`,
-    capture.intent
-      ? `\n# Intent (overrides everything below if they conflict)\n${capture.intent}`
-      : `\n# Intent\nNone given. Infer the product from the repo you are in. If you cannot, ask — do not guess a brand.`,
-    `\n# Decision order\n${DIRECTION_ORDER[direction]}`,
-    `\n# Translate, don't photocopy
-The capture is a measured reference, not source code to paste.
-Keep: hierarchy, rhythm, contrast, type scale, radius, motion character.
-Replace: brand, copy, imagery, and any token that already exists in this repo.`,
-    `\n# Source
-${capture.title}
-${capture.url}
-Viewport ${capture.viewport.width}×${capture.viewport.height} · selector \`${capture.selector}\` · ${capture.node.box.width}×${capture.node.box.height}`,
-    `\n# Structure (measured)\n${nodeTree(capture.node)}`,
-    rest ? `\n# Resting styles (measured)\n\`\`\`css\n${rest}\n\`\`\`` : "",
-    hover ? `\n# Hover (measured)\n\`\`\`css\n${hover}\n\`\`\`` : "",
-    focus ? `\n# Focus (measured)\n\`\`\`css\n${focus}\n\`\`\`` : "",
-    active ? `\n# Active (measured)\n\`\`\`css\n${active}\n\`\`\`` : "",
-    motion ? `\n# Motion (measured)\n\`\`\`css\n${motion}\n\`\`\`` : "",
-    `\n# Tokens from the page
-Colors:
+  const vars = tokens.cssVariables
+    .slice(0, 24)
+    .map((v) => `- \`${v.name}\`: ${v.value}`)
+    .join("\n");
+  return `Colors:
 ${colors || "- none"}
 
 Type:
 ${fonts || "- none"}
 
-Spacing: ${capture.tokens.spacing.slice(0, 8).join(" | ") || "none"}
-Radii: ${capture.tokens.radii.slice(0, 6).join(" | ") || "none"}
-Shadows: ${capture.tokens.shadows.slice(0, 4).join(" | ") || "none"}`,
-    `\n# Gaps in the capture\n${measuredNotes(capture)}`,
-    `\n${qualityBar(capture)}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+Spacing: ${tokens.spacing.slice(0, 8).join(" | ") || "none"}
+Radii: ${tokens.radii.slice(0, 6).join(" | ") || "none"}
+Shadows: ${tokens.shadows.slice(0, 4).join(" | ") || "none"}
+
+CSS variables:
+${vars || "- none"}`;
 }
 
-export function toDesignMd(capture: CaptureResult): string {
-  const colors = capture.tokens.colors
+function contrastLine(capture: CaptureResult): string {
+  const pair = capture.contrast[0];
+  if (!pair) return "not measured — check";
+  return `${pair.fg} on ${pair.bg} ${pair.ratio}:1 ${
+    pair.aa ? "AA" : "below AA — fix"
+  }`;
+}
+
+function resolveJob(capture: CaptureResult): Job {
+  return capture.job ?? capture.direction ?? "rebuild";
+}
+
+function measured(capture: CaptureResult) {
+  return {
+    hover: capture.measured?.hover ?? hasMap(capture.node.hover),
+    focus: capture.measured?.focus ?? hasMap(capture.node.focus),
+    active: capture.measured?.active ?? hasMap(capture.node.active),
+    motion:
+      capture.measured?.motion ??
+      capture.motion.transitions.length +
+        capture.motion.animations.length +
+        capture.motion.keyframes.length >
+        0,
+  };
+}
+
+export function toPhotocopy(capture: CaptureResult): string {
+  const flags = measured(capture);
+  const rest = stylesBlock(capture.node.tag, capture.node.styles);
+  const hover = stylesBlock(`${capture.node.tag}:hover`, capture.node.hover);
+  const focus = stylesBlock(`${capture.node.tag}:focus`, capture.node.focus);
+  const active = stylesBlock(`${capture.node.tag}:active`, capture.node.active);
+  const motion = [
+    ...capture.motion.transitions.map((t) => `transition: ${t}`),
+    ...capture.motion.animations.map((a) => `animation: ${a}`),
+    ...capture.motion.keyframes.map((k) => k.css),
+  ].join("\n");
+  const assets = capture.assets
+    .slice(0, 12)
+    .map((asset) => {
+      if (asset.kind === "svg" && asset.markup) {
+        return `- svg ${asset.width}×${asset.height}\n\`\`\`svg\n${asset.markup.slice(0, 2000)}\n\`\`\``;
+      }
+      return `- ${asset.kind}${asset.width ? ` ${asset.width}×${asset.height}` : ""}${
+        asset.alt ? ` alt="${asset.alt}"` : ""
+      }${asset.src ? ` ${asset.src}` : ""}`;
+    })
+    .join("\n");
+
+  return [
+    `# Photocopy
+Exact spec for the **selected** component. Rebuild this card/button 1:1.
+Drop logos and legal copy unless you truly want a clone of the company.
+This is not a prompt. Nothing here is a guess unless labeled.`,
+    `## Source
+${capture.title}
+${capture.url}
+Viewport ${capture.viewport.width}×${capture.viewport.height}
+\`${capture.selector}\` · ${capture.node.box.width}×${capture.node.box.height}`,
+    `## Structure (measured)
+${nodeTree(capture.node)}`,
+    rest
+      ? `## Computed CSS (diffed from browser defaults)
+\`\`\`css
+${rest}
+\`\`\``
+      : "",
+    hover
+      ? `## :hover (${flags.hover ? "measured" : "not measured"})
+\`\`\`css
+${hover}
+\`\`\``
+      : `## :hover
+not measured — don't invent`,
+    focus
+      ? `## :focus (${flags.focus ? "measured" : "not measured"})
+\`\`\`css
+${focus}
+\`\`\``
+      : `## :focus
+not measured — don't invent`,
+    active
+      ? `## :active (${flags.active ? "measured" : "not measured"})
+\`\`\`css
+${active}
+\`\`\``
+      : "",
+    motion
+      ? `## Motion (measured)
+\`\`\`css
+${motion}
+\`\`\``
+      : `## Motion
+not measured — don't invent`,
+    `## Tokens (this component)
+${formatTokens(capture.tokens ?? EMPTY_TOKENS)}`,
+    `## Contrast
+${contrastLine(capture)}`,
+    assets ? `## Assets (this component)\n${assets}` : "",
+    capture.html
+      ? `## HTML (sanitized)
+\`\`\`html
+${capture.html}
+\`\`\``
+      : "",
+    `## Gaps
+${stateLine("hover", flags.hover)}
+${stateLine("focus", flags.focus)}
+${stateLine("active", flags.active)}
+${stateLine("motion", flags.motion)}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+const KEEP_REPLACE = `## Keep / replace
+- **Keep:** hierarchy, type scale, density, radius, contrast, motion character.
+- **Replace:** brand, copy, logos, tokens you already own.`;
+
+const DONE_WHEN = `## Done when
+- One accent. Identity sits on the label/content, not the fill of every surface.
+- Real type ladder (display / title / body / meta).
+- Spacing on 4/8.
+- Focus visible.
+- No Inter-on-white. No purple gradients. No colored dots as identity.`;
+
+const RULE = `## Rule
+Translate the language, don't photocopy the **site**. You can still photocopy the **component**.`;
+
+export function toPrompt(
+  capture: CaptureResult,
+  scan?: PageScan | null,
+): string {
+  const job = resolveJob(capture);
+  const flags = measured(capture);
+  const photocopy = toPhotocopy(capture);
+  const site = scan
+    ? `\n## Site scan (detected)
+Use this palette and stack. It does not replace the component photocopy.
+
+${scanToTokenBlock(scan)}`
+    : capture.pageTokens && job !== "system"
+      ? `\n## Page tokens (secondary)
+Useful for Prompt/System. Do not dump these into a single-button rebuild.
+
+${formatTokens(capture.pageTokens)}`
+      : "";
+
+  return [
+    `# Job
+${jobSentence(job)}
+${targetHint(capture)}`,
+    capture.intent
+      ? `# Intent
+Your product language. Overrides the capture on conflict.
+
+${capture.intent}`
+      : `# Intent
+None given. Infer the product from the repo you are in. If you cannot, ask — do not guess a brand. Do not default to cloning the page.`,
+    KEEP_REPLACE,
+    DONE_WHEN,
+    RULE,
+    `# Gaps
+${stateLine("hover", flags.hover)}
+${stateLine("focus", flags.focus)}
+${stateLine("active", flags.active)}
+${stateLine("motion", flags.motion)}
+If a state was **not** in the CSS, mark it **not measured — don't invent**.`,
+    `# Capture body
+${photocopy}${site}`,
+  ].join("\n\n");
+}
+
+export function toDesignMd(
+  capture: CaptureResult,
+  scan?: PageScan | null,
+): string {
+  if (scan) {
+    return `${toScanMd(scan)}
+
+## Example pattern
+\`${capture.selector}\` · ${capture.node.box.width}×${capture.node.box.height}
+
+### Do
+- One accent. Put identity on content, not on every chrome surface.
+- Keep type hierarchy and density from the scan.
+- Preserve measured motion; do not add extra.
+
+### Don't
+- Inter / system-ui as a stand-in if a display face was measured.
+- Purple SaaS gradients, colored identity dots, glass on every card.
+- Clone the source logo, name, or illustration.
+`;
+  }
+  const tokens = tokensFor(capture);
+  const colors = tokens.colors
     .map((c) => `| ${c.value} | ${c.roles.join(", ")} | ${c.count} |`)
     .join("\n");
-  const fonts = capture.tokens.fonts
+  const fonts = tokens.fonts
     .map((f) => `- **${f.family}**: ${f.weights.join(", ")} · ${f.sizes.join(", ")}`)
     .join("\n");
-  const vars = capture.tokens.cssVariables
+  const vars = tokens.cssVariables
     .map((v) => `- \`${v.name}\`: ${v.value}`)
     .join("\n");
 
@@ -218,13 +326,13 @@ ${colors || "| — | — | — |"}
 ${fonts || "- (none detected)"}
 
 ## Spacing
-${capture.tokens.spacing.map((s) => `- ${s}`).join("\n") || "- 0"}
+${tokens.spacing.map((s) => `- ${s}`).join("\n") || "- 0"}
 
 ## Radius
-${capture.tokens.radii.map((s) => `- ${s}`).join("\n") || "- 0"}
+${tokens.radii.map((s) => `- ${s}`).join("\n") || "- 0"}
 
 ## Shadow
-${capture.tokens.shadows.map((s) => `- ${s}`).join("\n") || "- none"}
+${tokens.shadows.map((s) => `- ${s}`).join("\n") || "- none"}
 
 ## CSS variables
 ${vars || "- none"}
@@ -244,32 +352,39 @@ ${vars || "- none"}
 `;
 }
 
-export function toSkillMd(capture: CaptureResult): string {
-  const direction = capture.direction ?? "rebuild";
+export function toSkillMd(
+  capture: CaptureResult,
+  scan?: PageScan | null,
+): string {
+  const job = resolveJob(capture);
   return `---
 name: captured-design
-description: Apply the measured design language from ${capture.title}. Direction: ${direction}.
+description: Apply the measured design language from ${capture.title}. Job: ${job}.
 ---
 
 # Captured design skill
 
-${DIRECTION_JOB[direction]}
+${jobSentence(job)}
 
-Decision order:
-${DIRECTION_ORDER[direction]}
+${KEEP_REPLACE}
 
-${toDesignMd(capture)}
+${DONE_WHEN}
+
+${RULE}
+
+${toDesignMd(capture, scan)}
 
 ## Agent rules
 1. Intent wins if it conflicts with the capture.
-2. Measured styles beat guesses. If a state is missing, follow Gaps in the capture.
+2. Measured styles beat guesses. If a state is missing, do not invent it.
 3. Translate into this repo's components. Do not paste the source DOM.
-4. Stop after one pattern unless asked for a system.
+4. Stop after one pattern unless the job is System.
 `;
 }
 
 export function toCss(capture: CaptureResult): string {
-  const root = capture.tokens.cssVariables
+  const tokens = tokensFor(capture);
+  const root = tokens.cssVariables
     .map((v) => `  ${v.name}: ${v.value};`)
     .join("\n");
   const rest = Object.entries(capture.node.styles)
@@ -341,6 +456,11 @@ function approxTailwind(prop: string, value: string): string | null {
     if (n >= 14) return "text-sm";
     return "text-xs";
   }
+  if (prop === "color" || prop === "background-color") {
+    const hex = cssColorToHex(value);
+    if (!hex) return null;
+    return prop === "color" ? `text-[${hex}]` : `bg-[${hex}]`;
+  }
   return null;
 }
 
@@ -360,17 +480,41 @@ export function toTailwind(capture: CaptureResult): string {
   ].join("\n");
 }
 
-export function renderOutput(kind: OutputKind, capture: CaptureResult): string {
+export function renderOutput(
+  kind: OutputKind,
+  capture: CaptureResult,
+  scan?: PageScan | null,
+): string {
   switch (kind) {
+    case "prompt":
+      return toPrompt(capture, scan);
     case "design-md":
-      return toDesignMd(capture);
+      return toDesignMd(capture, scan);
     case "skill-md":
-      return toSkillMd(capture);
+      return toSkillMd(capture, scan);
     case "css":
       return toCss(capture);
     case "tailwind":
       return toTailwind(capture);
+    case "photocopy":
     default:
-      return toPrompt(capture);
+      return toPhotocopy(capture);
+  }
+}
+
+export function outputLabel(kind: OutputKind): string {
+  switch (kind) {
+    case "prompt":
+      return "Prompt";
+    case "design-md":
+      return "DESIGN.md";
+    case "skill-md":
+      return "SKILL.md";
+    case "css":
+      return "CSS";
+    case "tailwind":
+      return "Tailwind";
+    default:
+      return "Photocopy";
   }
 }

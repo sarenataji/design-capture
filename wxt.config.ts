@@ -5,8 +5,8 @@ export default defineConfig({
   manifest: {
     name: "Design Capture",
     description:
-      "Hover any element, capture computed design, states, motion, and tokens, then copy an AI prompt, DESIGN.md, or Tailwind.",
-    version: "0.2.0",
+      "Inspect on hover. Photocopy a component. Prompt with a job so the model does not clone the site.",
+    version: "0.3.0",
     permissions: ["storage", "sidePanel", "activeTab", "scripting"],
     host_permissions: ["<all_urls>"],
     action: {

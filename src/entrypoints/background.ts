@@ -30,6 +30,13 @@ export default defineBackground(() => {
       });
       sendResponse({ ok: true });
     }
+    if (message?.type === "save-scan") {
+      void browser.storage.local.set({
+        [STORAGE_KEYS.lastScan]: message.payload,
+        [STORAGE_KEYS.lastScanAt]: Date.now(),
+      });
+      sendResponse({ ok: true });
+    }
     return false;
   });
 });

@@ -103,13 +103,13 @@ export function captureMotion(el: Element) {
     .map((part) => part.trim().split(" ")[0])
     .filter(Boolean) as string[];
 
-  const keyframes = captureKeyframes().filter(
-    (frame) => names.includes(frame.name) || names.length === 0,
-  );
+  const keyframes = names.length
+    ? captureKeyframes().filter((frame) => names.includes(frame.name))
+    : [];
 
   return {
     transitions,
     animations,
-    keyframes: names.length ? keyframes : keyframes.slice(0, 12),
+    keyframes,
   };
 }

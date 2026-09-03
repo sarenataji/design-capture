@@ -14,32 +14,34 @@
       </div>
       <div class="actions">
         <button id="pick" type="button">Pick</button>
+        <button id="scan" type="button" class="ghost">Scan page</button>
         <button id="copy" type="button" class="ghost">Copy</button>
       </div>
     </header>
 
+    <section class="jobs" aria-label="Job">
+      <span>Job</span>
+      <div id="jobs" class="job-row">
+        <button type="button" data-job="rebuild" class="on">Rebuild</button>
+        <button type="button" data-job="restyle">Restyle</button>
+        <button type="button" data-job="system">System</button>
+        <button type="button" data-job="translate">Translate</button>
+        <button type="button" data-job="motion">Motion</button>
+      </div>
+    </section>
+
     <label class="intent">
-      <span>Intent <em>fills first — this shapes the prompt</em></span>
+      <span>Intent <em>optional — overrides capture on conflict</em></span>
       <textarea
         id="intent"
         rows="3"
-        placeholder="Dark product board. Our accent. Do not clone branding."
+        placeholder="Dark, athletic, accent on the label not the fill"
       ></textarea>
     </label>
 
     <div class="filters">
       <label>
-        <span>Direction</span>
-        <select id="direction">
-          <option value="rebuild">Rebuild into our product</option>
-          <option value="restyle">Restyle ours with this look</option>
-          <option value="system">System only — DESIGN.md</option>
-          <option value="translate">Translate stack</option>
-          <option value="motion">Motion / states only</option>
-        </select>
-      </label>
-      <label>
-        <span>Target</span>
+        <span>Target stack</span>
         <select id="target">
           <option value="auto">Auto (this repo)</option>
           <option value="react">React</option>
@@ -50,6 +52,18 @@
       </label>
     </div>
 
+    <section id="scan-report" class="scan" hidden>
+      <div class="scan-head">
+        <span>Site scan <em>detected</em></span>
+        <button type="button" id="copy-scan" class="ghost">Copy scan</button>
+      </div>
+      <div id="scan-colors" class="scan-colors"></div>
+      <p id="scan-type" class="scan-line"></p>
+      <p id="scan-space" class="scan-line"></p>
+      <p id="scan-detected" class="scan-line"></p>
+      <p id="scan-vars" class="scan-line" hidden></p>
+    </section>
+
     <section id="summary" class="summary empty" hidden>
       <div>
         <strong id="sum-title">No capture yet</strong>
@@ -59,19 +73,20 @@
     </section>
 
     <nav class="tabs" id="tabs" aria-label="Output format">
-      <button type="button" data-kind="prompt" class="on">Prompt</button>
+      <button type="button" data-kind="photocopy" class="on">Photocopy</button>
+      <button type="button" data-kind="prompt">Prompt</button>
       <button type="button" data-kind="design-md">DESIGN.md</button>
       <button type="button" data-kind="skill-md">SKILL.md</button>
       <button type="button" data-kind="css">CSS</button>
       <button type="button" data-kind="tailwind">Tailwind</button>
     </nav>
 
-    <pre id="out">Alt+Shift+D · hover · click. Prompt copies automatically.</pre>
+    <pre id="out">Alt+Shift+D · hover facts (no AI) · click to capture. Photocopy is the spec. Prompt wraps it with Job + Intent.</pre>
 
     <footer>
       <span><kbd>⌥⇧D</kbd> picker</span>
       <span><kbd>↑</kbd><kbd>↓</kbd> parent / child</span>
-      <span><kbd>Esc</kbd> stop</span>
+      <span>Scan page = site</span>
     </footer>
 
     <script type="module" src="./main.ts"></script>

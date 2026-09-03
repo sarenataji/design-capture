@@ -1,3 +1,5 @@
+import { parseCssColor } from "./color";
+
 export const STYLE_PROPS = [
   "display",
   "position",
@@ -67,16 +69,13 @@ export const STYLE_PROPS = [
   "aspect-ratio",
 ] as const;
 
-const TRANSPARENT = new Set([
-  "rgba(0, 0, 0, 0)",
-  "rgba(0,0,0,0)",
-  "transparent",
-  "none",
-]);
-
 export function isEmptyValue(value: string): boolean {
   const v = value.trim().toLowerCase();
-  return !v || TRANSPARENT.has(v) || v === "normal" || v === "auto";
+  if (!v || v === "none" || v === "normal" || v === "auto" || v === "transparent") {
+    return true;
+  }
+  const color = parseCssColor(v);
+  return Boolean(color && color.a === 0);
 }
 
 export function readStyles(el: Element): Record<string, string> {
@@ -90,7 +89,8 @@ export function readStyles(el: Element): Record<string, string> {
   return out;
 }
 
-export function diffStyles(
+/** Properties in `current` that differ from `baseline`. Empty is a valid result. */
+export function changedStyles(
   current: Record<string, string>,
   baseline: Record<string, string>,
 ): Record<string, string> {
@@ -98,6 +98,15 @@ export function diffStyles(
   for (const [key, value] of Object.entries(current)) {
     if (baseline[key] !== value) out[key] = value;
   }
+  return out;
+}
+
+/** Like changedStyles, but if nothing differs keep `current` (used vs UA defaults). */
+export function diffStyles(
+  current: Record<string, string>,
+  baseline: Record<string, string>,
+): Record<string, string> {
+  const out = changedStyles(current, baseline);
   return Object.keys(out).length ? out : current;
 }
 
@@ -111,40 +120,4 @@ export function baselineForTag(tag: string): Record<string, string> {
   return styles;
 }
 
-export function cssColorToHex(value: string): string | null {
-  const rgb = value.match(
-    /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)/i,
-  );
-  if (!rgb) {
-    if (value.startsWith("#")) return value.toLowerCase();
-    return null;
-  }
-  const r = Math.round(Number(rgb[1]));
-  const g = Math.round(Number(rgb[2]));
-  const b = Math.round(Number(rgb[3]));
-  const a = rgb[4] === undefined ? 1 : Number(rgb[4]);
-  if (a === 0) return null;
-  const hex = `#${[r, g, b].map((n) => n.toString(16).padStart(2, "0")).join("")}`;
-  if (a < 1) return `${hex}${Math.round(a * 255).toString(16).padStart(2, "0")}`;
-  return hex;
-}
-
-export function relativeLuminance(hex: string): number {
-  const raw = hex.replace("#", "").slice(0, 6);
-  const toLin = (c: number) => {
-    const s = c / 255;
-    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-  };
-  const r = toLin(parseInt(raw.slice(0, 2), 16));
-  const g = toLin(parseInt(raw.slice(2, 4), 16));
-  const b = toLin(parseInt(raw.slice(4, 6), 16));
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-export function contrastRatio(fg: string, bg: string): number {
-  const L1 = relativeLuminance(fg);
-  const L2 = relativeLuminance(bg);
-  const light = Math.max(L1, L2);
-  const dark = Math.min(L1, L2);
-  return (light + 0.05) / (dark + 0.05);
-}
+export { contrastRatio, cssColorToHex, relativeLuminance } from "./color";
