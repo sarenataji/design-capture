@@ -1,5 +1,7 @@
 import { JOBS } from "../../lib/jobs";
+import { OUTPUTS } from "../../lib/outputs";
 import { renderOutput } from "../../lib/prompt";
+import { TARGETS } from "../../lib/targets";
 import { stackByKind, toScanMd } from "../../lib/scan-report";
 import { STORAGE_KEYS } from "../../lib/storage";
 import type {
@@ -14,11 +16,12 @@ const out = document.querySelector<HTMLPreElement>("#out")!;
 const intent = document.querySelector<HTMLTextAreaElement>("#intent")!;
 const target = document.querySelector<HTMLSelectElement>("#target")!;
 const jobs = document.querySelector<HTMLElement>("#jobs")!;
-const jobHelp = document.querySelector<HTMLButtonElement>("#job-help")!;
-const jobGuide = document.querySelector<HTMLElement>("#job-guide")!;
 const jobGuideList = document.querySelector<HTMLElement>("#job-guide-list")!;
-const jobGuideClose =
-  document.querySelector<HTMLButtonElement>("#job-guide-close")!;
+const targetGuideList =
+  document.querySelector<HTMLElement>("#target-guide-list")!;
+const outputGuideList =
+  document.querySelector<HTMLElement>("#output-guide-list")!;
+const scrim = document.querySelector<HTMLElement>("#scrim")!;
 const pick = document.querySelector<HTMLButtonElement>("#pick")!;
 const scanBtn = document.querySelector<HTMLButtonElement>("#scan")!;
 const copy = document.querySelector<HTMLButtonElement>("#copy")!;
@@ -42,13 +45,28 @@ let capture: CaptureResult | null = null;
 let scan: PageScan | null = null;
 let picking = false;
 
-jobGuideList.innerHTML = JOBS.map(
-  (item) =>
-    `<button type="button" data-job="${item.id}">
-      <strong>${item.label}</strong>
-      <small>${item.plain}</small>
-    </button>`,
+target.innerHTML = TARGETS.map(
+  (item) => `<option value="${item.id}">${item.label}</option>`,
 ).join("");
+
+function guideRows(
+  items: { id: string; label: string; plain: string }[],
+  key: string,
+) {
+  return items
+    .map(
+      (item) =>
+        `<button type="button" class="guide-row" data-${key}="${item.id}">
+          <strong>${item.label}</strong>
+          <small>${item.plain}</small>
+        </button>`,
+    )
+    .join("");
+}
+
+jobGuideList.innerHTML = guideRows(JOBS, "job");
+targetGuideList.innerHTML = guideRows(TARGETS, "target");
+outputGuideList.innerHTML = guideRows(OUTPUTS, "kind");
 
 async function restore() {
   const stored = await browser.storage.local.get([
@@ -71,11 +89,16 @@ async function restore() {
   if (stored.lastScan) scan = stored.lastScan as PageScan;
   syncTabs();
   syncJobs();
+  syncTarget();
   render();
 }
 
 function syncTabs() {
-  for (const child of tabs.querySelectorAll("button")) {
+  const buttons = [
+    ...tabs.querySelectorAll("button"),
+    ...outputGuideList.querySelectorAll("button"),
+  ];
+  for (const child of buttons) {
     child.classList.toggle("on", child.dataset.kind === kind);
   }
 }
@@ -90,6 +113,12 @@ function syncJobs() {
   }
 }
 
+function syncTarget() {
+  for (const child of targetGuideList.querySelectorAll("button")) {
+    child.classList.toggle("on", child.dataset.target === target.value);
+  }
+}
+
 function setJob(next: Job) {
   job = next;
   void browser.storage.local.set({
@@ -100,12 +129,63 @@ function setJob(next: Job) {
   render();
 }
 
-function setGuide(open: boolean) {
-  jobGuide.hidden = !open;
-  jobHelp.classList.toggle("on", open);
-  jobHelp.setAttribute("aria-expanded", String(open));
-  if (open) jobGuideList.querySelector<HTMLButtonElement>("button")?.focus();
-  else jobHelp.focus();
+function setTarget(next: Target) {
+  target.value = next;
+  void browser.storage.local.set({ [STORAGE_KEYS.target]: next });
+  syncTarget();
+  render();
+}
+
+function setKind(next: OutputKind) {
+  kind = next;
+  void browser.storage.local.set({ [STORAGE_KEYS.outputKind]: kind });
+  syncTabs();
+  render();
+}
+
+let openHelp: HTMLButtonElement | null = null;
+
+function guideFor(help: HTMLButtonElement) {
+  return document.querySelector<HTMLElement>(`#${help.dataset.guide}`)!;
+}
+
+function setGuide(next: HTMLButtonElement | null) {
+  const prev = openHelp;
+  if (prev) {
+    guideFor(prev).hidden = true;
+    prev.classList.remove("on");
+    prev.setAttribute("aria-expanded", "false");
+  }
+  openHelp = next;
+  scrim.hidden = !next;
+  if (!next) {
+    prev?.focus();
+    return;
+  }
+  const guide = guideFor(next);
+  const list = guide.querySelector<HTMLElement>(".guide-list")!;
+  guide.hidden = false;
+  guide.classList.remove("up");
+  list.style.maxHeight = "";
+  next.classList.add("on");
+  next.setAttribute("aria-expanded", "true");
+
+  const anchor = (guide.offsetParent as HTMLElement).getBoundingClientRect();
+  const below = window.innerHeight - anchor.bottom - 20;
+  const above = anchor.top - 20;
+  const up = guide.offsetHeight > below && above > below;
+  guide.classList.toggle("up", up);
+  list.style.maxHeight = `${
+    (up ? above : below) - (guide.offsetHeight - list.offsetHeight)
+  }px`;
+
+  const trigger = next.getBoundingClientRect();
+  guide.style.setProperty(
+    "--caret",
+    `${trigger.left + trigger.width / 2 - guide.getBoundingClientRect().left - 4}px`,
+  );
+
+  (list.querySelector<HTMLButtonElement>("button") ?? guide).focus();
 }
 
 function setPicking(on: boolean) {
@@ -280,8 +360,7 @@ intent.addEventListener("input", () => {
 });
 
 target.addEventListener("change", () => {
-  void browser.storage.local.set({ [STORAGE_KEYS.target]: target.value });
-  render();
+  setTarget(target.value as Target);
 });
 
 jobs.addEventListener("click", (event) => {
@@ -290,35 +369,32 @@ jobs.addEventListener("click", (event) => {
   setJob(button.dataset.job as Job);
 });
 
-jobGuideList.addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest("button");
-  if (!button?.dataset.job) return;
-  setJob(button.dataset.job as Job);
-  setGuide(false);
-});
-
-jobHelp.addEventListener("click", () => setGuide(jobGuide.hidden));
-
-jobGuideClose.addEventListener("click", () => setGuide(false));
-
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !jobGuide.hidden) setGuide(false);
+  if (event.key === "Escape" && openHelp) setGuide(null);
 });
 
 document.addEventListener("click", (event) => {
-  if (jobGuide.hidden) return;
   const el = event.target as HTMLElement;
-  if (el.closest("#job-guide") || el.closest("#job-help")) return;
-  setGuide(false);
+  const help = el.closest<HTMLButtonElement>(".help");
+  if (help) {
+    setGuide(openHelp === help ? null : help);
+    return;
+  }
+  if (el.closest(".guide-x")) {
+    setGuide(null);
+    return;
+  }
+  const row = el.closest<HTMLButtonElement>("button.guide-row");
+  if (row?.dataset.job) setJob(row.dataset.job as Job);
+  if (row?.dataset.target) setTarget(row.dataset.target as Target);
+  if (row?.dataset.kind) setKind(row.dataset.kind as OutputKind);
+  if (row || (openHelp && !el.closest(".guide"))) setGuide(null);
 });
 
 tabs.addEventListener("click", (event) => {
   const button = (event.target as HTMLElement).closest("button");
   if (!button?.dataset.kind) return;
-  kind = button.dataset.kind as OutputKind;
-  void browser.storage.local.set({ [STORAGE_KEYS.outputKind]: kind });
-  syncTabs();
-  render();
+  setKind(button.dataset.kind as OutputKind);
 });
 
 browser.storage.onChanged.addListener((changes, area) => {

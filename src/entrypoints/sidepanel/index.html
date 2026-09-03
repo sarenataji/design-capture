@@ -24,28 +24,14 @@
         <span>Job</span>
         <button
           type="button"
-          id="job-help"
           class="help"
+          data-guide="job-guide"
           aria-label="What do these jobs mean?"
           aria-expanded="false"
           aria-controls="job-guide"
         >
           ?
         </button>
-
-        <div id="job-guide" class="guide" role="dialog" aria-label="Jobs explained" hidden>
-          <div class="guide-head">
-            <strong>What is a job?</strong>
-            <button type="button" id="job-guide-close" class="guide-x" aria-label="Close">
-              ×
-            </button>
-          </div>
-          <p class="guide-lede">
-            It tells the AI what to do with the design you capture.
-          </p>
-          <div id="job-guide-list" class="guide-list"></div>
-          <p class="guide-foot">Tap one to use it. You can change it any time.</p>
-        </div>
       </div>
 
       <div id="jobs" class="job-row">
@@ -55,33 +41,121 @@
         <button type="button" data-job="translate">Translate</button>
         <button type="button" data-job="motion">Motion</button>
       </div>
+
+      <div id="job-guide" class="guide" role="dialog" aria-label="Jobs explained" hidden>
+        <div class="guide-head">
+          <strong>What is a job?</strong>
+          <button type="button" class="guide-x" aria-label="Close">×</button>
+        </div>
+        <p class="guide-lede">
+          It tells the AI what to do with the design you capture.
+        </p>
+        <div id="job-guide-list" class="guide-list"></div>
+        <p class="guide-foot">Tap one to use it. You can change it any time.</p>
+      </div>
     </section>
 
-    <label class="intent">
-      <span>Intent <em>optional — overrides capture on conflict</em></span>
+    <div class="intent">
+      <div class="field-head">
+        <label for="intent">Intent <em>optional</em></label>
+        <button
+          type="button"
+          class="help"
+          data-guide="intent-guide"
+          aria-label="What is intent?"
+          aria-expanded="false"
+          aria-controls="intent-guide"
+        >
+          ?
+        </button>
+      </div>
       <textarea
         id="intent"
         rows="3"
         placeholder="Dark, athletic, accent on the label not the fill"
       ></textarea>
-    </label>
+
+      <div
+        id="intent-guide"
+        class="guide"
+        role="dialog"
+        aria-label="Intent explained"
+        tabindex="-1"
+        hidden
+      >
+        <div class="guide-head">
+          <strong>What is intent?</strong>
+          <button type="button" class="guide-x" aria-label="Close">×</button>
+        </div>
+        <p class="guide-lede">
+          Anything you want changed, in your own words. Leave it empty to copy
+          the design as-is.
+        </p>
+        <div class="guide-list">
+          <div class="guide-row">
+            <strong>For example</strong>
+            <small>"Darker, and put the highlight on the text, not the button."</small>
+          </div>
+          <div class="guide-row">
+            <strong>If it disagrees</strong>
+            <small>Your words win over what was measured on the page.</small>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div class="filters">
-      <label>
-        <span>Target stack</span>
-        <select id="target">
-          <option value="auto">Auto (this repo)</option>
-          <option value="react">React</option>
-          <option value="react-native">React Native</option>
-          <option value="tailwind">Tailwind</option>
-          <option value="html">HTML / CSS</option>
-        </select>
-      </label>
+      <div class="field-head">
+        <label for="target">Target stack</label>
+        <button
+          type="button"
+          class="help"
+          data-guide="target-guide"
+          aria-label="What is a target stack?"
+          aria-expanded="false"
+          aria-controls="target-guide"
+        >
+          ?
+        </button>
+      </div>
+      <select id="target"></select>
+
+      <div
+        id="target-guide"
+        class="guide"
+        role="dialog"
+        aria-label="Target stack explained"
+        hidden
+      >
+        <div class="guide-head">
+          <strong>What is a target stack?</strong>
+          <button type="button" class="guide-x" aria-label="Close">×</button>
+        </div>
+        <p class="guide-lede">
+          The kind of code you want back. Not sure? Leave it on Auto.
+        </p>
+        <div id="target-guide-list" class="guide-list"></div>
+        <p class="guide-foot">Tap one to use it. You can change it any time.</p>
+      </div>
     </div>
+
+    <div id="scrim" class="scrim" hidden></div>
 
     <section id="scan-report" class="scan" hidden>
       <div class="scan-head">
-        <span>Site scan <em>detected</em></span>
+        <div class="field-head">
+          <span>Site scan <em>detected</em></span>
+          <button
+            type="button"
+            class="help"
+            data-guide="scan-guide"
+            aria-label="What do these scan results mean?"
+            aria-expanded="false"
+            aria-controls="scan-guide"
+          >
+            ?
+          </button>
+        </div>
         <button type="button" id="copy-scan" class="ghost">Copy scan</button>
       </div>
       <div id="scan-colors" class="scan-colors"></div>
@@ -89,6 +163,49 @@
       <p id="scan-space" class="scan-line"></p>
       <div id="scan-stack" class="scan-stack"></div>
       <p id="scan-vars" class="scan-line" hidden></p>
+
+      <div
+        id="scan-guide"
+        class="guide"
+        role="dialog"
+        aria-label="Scan results explained"
+        tabindex="-1"
+        hidden
+      >
+        <div class="guide-head">
+          <strong>Reading the scan</strong>
+          <button type="button" class="guide-x" aria-label="Close">×</button>
+        </div>
+        <p class="guide-lede">
+          What this page is made of, measured from the page itself.
+        </p>
+        <div class="guide-list">
+          <div class="guide-row">
+            <strong>Colour swatches</strong>
+            <small>Grouped by where each is used. Tap one to copy it.</small>
+          </div>
+          <div class="guide-row">
+            <strong>The font line</strong>
+            <small>The typeface, its weights, and every text size found.</small>
+          </div>
+          <div class="guide-row">
+            <strong>Space and radius</strong>
+            <small>Gaps between things, and how round the corners are.</small>
+          </div>
+          <div class="guide-row">
+            <strong>Framework</strong>
+            <small>The main tool the site was built with, like Next.js.</small>
+          </div>
+          <div class="guide-row">
+            <strong>Analytics</strong>
+            <small>What the site uses to measure its visitors.</small>
+          </div>
+          <div class="guide-row">
+            <strong>Build</strong>
+            <small>The tool that packaged the site's code.</small>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section id="summary" class="summary empty" hidden>
@@ -99,14 +216,48 @@
       <div id="swatches" class="swatches"></div>
     </section>
 
-    <nav class="tabs" id="tabs" aria-label="Output format">
-      <button type="button" data-kind="photocopy" class="on">Photocopy</button>
-      <button type="button" data-kind="prompt">Prompt</button>
-      <button type="button" data-kind="design-md">DESIGN.md</button>
-      <button type="button" data-kind="skill-md">SKILL.md</button>
-      <button type="button" data-kind="css">CSS</button>
-      <button type="button" data-kind="tailwind">Tailwind</button>
-    </nav>
+    <section class="outputs">
+      <div class="field-head">
+        <span>Output</span>
+        <button
+          type="button"
+          class="help"
+          data-guide="output-guide"
+          aria-label="What are these output formats?"
+          aria-expanded="false"
+          aria-controls="output-guide"
+        >
+          ?
+        </button>
+      </div>
+
+      <nav class="tabs" id="tabs" aria-label="Output format">
+        <button type="button" data-kind="photocopy" class="on">Photocopy</button>
+        <button type="button" data-kind="prompt">Prompt</button>
+        <button type="button" data-kind="design-md">DESIGN.md</button>
+        <button type="button" data-kind="skill-md">SKILL.md</button>
+        <button type="button" data-kind="css">CSS</button>
+        <button type="button" data-kind="tailwind">Tailwind</button>
+      </nav>
+
+      <div
+        id="output-guide"
+        class="guide"
+        role="dialog"
+        aria-label="Output formats explained"
+        hidden
+      >
+        <div class="guide-head">
+          <strong>Which output do I want?</strong>
+          <button type="button" class="guide-x" aria-label="Close">×</button>
+        </div>
+        <p class="guide-lede">
+          The same capture, written out in different ways.
+        </p>
+        <div id="output-guide-list" class="guide-list"></div>
+        <p class="guide-foot">Tap one to use it. You can change it any time.</p>
+      </div>
+    </section>
 
     <pre id="out">Alt+Shift+D · hover facts (no AI) · click to capture. Photocopy is the spec. Prompt wraps it with Job + Intent.</pre>
 

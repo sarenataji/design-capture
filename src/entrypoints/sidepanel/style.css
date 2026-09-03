@@ -105,6 +105,8 @@ button {
   padding-top: 12px;
 }
 
+.jobs, .intent, .filters, .scan, .outputs { position: relative; }
+
 .jobs span, .intent span, .filters span {
   color: var(--muted);
   font-size: 11px;
@@ -116,10 +118,15 @@ button {
 }
 
 .field-head {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.field-head label {
+  display: inline;
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .help {
@@ -150,25 +157,45 @@ button {
 
 .guide {
   position: absolute;
-  top: calc(100% + 9px);
-  left: -4px;
-  right: -4px;
+  top: calc(100% + 8px);
+  left: 10px;
+  right: 10px;
   z-index: 20;
-  padding: 12px;
+  padding: 11px 12px 12px;
   background: var(--pop);
   border: 1px solid var(--pop-line);
   border-radius: 10px;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
   animation: guide-in 150ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  background: rgba(6, 7, 5, 0.55);
+  animation: scrim-in 150ms ease;
+}
+
+.scrim[hidden] { display: none; }
+
+@keyframes scrim-in {
+  from { opacity: 0; }
+}
+
 .guide[hidden] { display: none; }
+
+.guide.up {
+  top: auto;
+  bottom: calc(100% + 8px);
+  animation-name: guide-in-up;
+}
 
 .guide::before {
   content: "";
   position: absolute;
   top: -5px;
-  left: 33px;
+  left: var(--caret, 25px);
   width: 8px;
   height: 8px;
   background: var(--pop);
@@ -178,10 +205,26 @@ button {
   transform: rotate(45deg);
 }
 
+.guide.up::before {
+  top: auto;
+  bottom: -5px;
+  border-left: 0;
+  border-top: 0;
+  border-right: 1px solid var(--pop-line);
+  border-bottom: 1px solid var(--pop-line);
+}
+
 @keyframes guide-in {
   from {
     opacity: 0;
     transform: translateY(-6px) scale(0.985);
+  }
+}
+
+@keyframes guide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
   }
 }
 
@@ -226,9 +269,10 @@ button {
 .guide-list {
   display: grid;
   gap: 2px;
+  overflow-y: auto;
 }
 
-.guide-list button {
+.guide-row {
   display: grid;
   gap: 3px;
   width: 100%;
@@ -241,21 +285,21 @@ button {
   transition: background 120ms ease;
 }
 
-.guide-list button:hover { background: rgba(255, 255, 255, 0.045); }
+button.guide-row:hover { background: rgba(255, 255, 255, 0.045); }
 
-.guide-list button.on {
+.guide-row.on {
   background: rgba(255, 184, 212, 0.07);
   border-left-color: var(--accent);
 }
 
-.guide-list strong {
+.guide-row strong {
   font-size: 12px;
   font-weight: 650;
 }
 
-.guide-list button.on strong { color: var(--accent); }
+.guide-row.on strong { color: var(--accent); }
 
-.guide-list small {
+.guide-row small {
   color: var(--muted);
   font-size: 11px;
   line-height: 1.45;
@@ -458,11 +502,15 @@ select {
   border: 1px solid rgba(255,255,255,0.15);
 }
 
+.outputs { padding-top: 10px; }
+
+.outputs .field-head { padding: 0 14px; }
+
 .tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 0;
-  padding-top: 10px;
+  padding-top: 4px;
   border-bottom: 1px solid var(--line);
 }
 

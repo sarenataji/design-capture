@@ -12,7 +12,7 @@ export const JOBS: {
     sentence:
       "Rebuild this pattern in our product. Keep measured numbers. Swap brand and copy.",
     plain:
-      "Make the same thing inside your own app — same sizes and spacing, but with your words and your brand.",
+      "Make the same thing in your own app — same sizes and spacing, your words and brand.",
   },
   {
     id: "restyle",
@@ -20,14 +20,14 @@ export const JOBS: {
     sentence:
       "Keep our screens. Absorb this look (type, density, radius, color roles).",
     plain:
-      "Keep your pages as they are and just borrow the look: fonts, colours, and rounded corners.",
+      "Keep your pages, just borrow the look: fonts, colours, rounded corners.",
   },
   {
     id: "system",
     label: "System",
     sentence: "DESIGN.md only. No page. Tokens, rules, and anti-patterns.",
     plain:
-      "Build nothing yet. Write down the style rules so everything you make later looks consistent.",
+      "Build nothing yet. Write down the style rules so future work matches.",
   },
   {
     id: "translate",
@@ -35,7 +35,7 @@ export const JOBS: {
     sentence:
       "Same pattern, other stack. Preserve hierarchy and rhythm. Drop hover-only fluff that has no native equivalent.",
     plain:
-      "Same design, different technology — for moving it to a phone app or another setup.",
+      "Same design, different technology — like moving it to a phone app.",
   },
   {
     id: "motion",
@@ -43,7 +43,7 @@ export const JOBS: {
     sentence:
       "Layout stays. Copy measured states and timing only. Do not restyle.",
     plain:
-      "Copy only the movement — hovers, fades, and timing. The look stays untouched.",
+      "Copy only the movement — hovers, fades, timing. The look stays.",
   },
 ];
 
