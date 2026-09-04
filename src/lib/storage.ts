@@ -9,4 +9,6 @@ export const STORAGE_KEYS = {
   direction: "direction",
   pickerActive: "pickerActive",
   outputKind: "outputKind",
+  scanFolders: "scanFolders",
+  savedScans: "savedScans",
 } as const;

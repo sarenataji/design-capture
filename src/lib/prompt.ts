@@ -146,10 +146,30 @@ function measured(capture: CaptureResult) {
 function formatMotion(capture: CaptureResult): string {
   const effects = capture.motion.effects ?? [];
   const specs = effects.map((effect, index) => {
+    const opacity = effect.values?.opacity;
+    const fromOpacity = Number.parseFloat(opacity?.from ?? "");
+    const toOpacity = Number.parseFloat(opacity?.to ?? "");
+    const meaning = Number.isFinite(fromOpacity) && Number.isFinite(toOpacity)
+      ? fromOpacity <= 0.1 && toOpacity >= 0.5
+        ? "Reveals the target."
+        : fromOpacity >= 0.5 && toOpacity <= 0.1
+          ? "Hides the target."
+          : "Changes the target's visibility."
+      : effect.values?.transform
+        ? "Moves, scales, or rotates the target."
+        : "";
     const details = [
       `- **${index + 1}. ${effect.type}** on \`${effect.target}\``,
       `  - Trigger: ${effect.trigger}`,
+      effect.triggerSource ? `  - Evidence${effect.triggerConfidence ? ` (${effect.triggerConfidence} confidence)` : ""}: ${effect.triggerSource}` : "",
+      meaning ? `  - Behavior: ${meaning}` : "",
+      effect.library
+        ? `  - Library / engine (${effect.library.confidence} confidence): ${effect.library.name} — ${effect.library.evidence}`
+        : "",
       `  - Properties: ${effect.properties.join(", ") || "resolved by keyframes"}`,
+      effect.values && Object.keys(effect.values).length
+        ? `  - Values: ${Object.entries(effect.values).map(([property, values]) => `${property} ${values.from} → ${values.to}`).join(" · ")}`
+        : "",
       `  - Timing: ${effect.duration} duration · ${effect.delay} delay · ${effect.easing}`,
       `  - Playback: ${effect.iterations} iteration(s) · ${effect.direction} · fill ${effect.fill}${effect.playState ? ` · ${effect.playState}` : ""}`,
       effect.timeline ? `  - Timeline: ${effect.timeline}` : "",

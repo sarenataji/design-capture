@@ -4,12 +4,12 @@ import { readStyles } from "./css";
 import { outputLabel, renderOutput } from "./prompt";
 import { STORAGE_KEYS } from "./storage";
 import { captureVisibleColors } from "./visual";
+import { snapshotMotionStyles } from "./states";
 import type {
   CaptureResult,
   Job,
   OutputKind,
   PageScan,
-  StyleMap,
   Target,
 } from "./types";
 
@@ -48,7 +48,6 @@ export function createPicker(options: PickerOptions) {
   let toastEl: HTMLDivElement | null = null;
   let toastTimer = 0;
   let previewSeq = 0;
-  let liveStyles: StyleMap = {};
 
   function ensureUi() {
     if (host && document.documentElement.contains(host)) return;
@@ -251,7 +250,6 @@ export function createPicker(options: PickerOptions) {
       height: `${rect.height}px`,
     });
 
-    liveStyles = readStyles(current);
     const preview = hoverPreview(current);
     tip.hidden = false;
     tip.innerHTML = tipHtml(preview, { locked, expanded });
@@ -348,7 +346,8 @@ export function createPicker(options: PickerOptions) {
 
   /** Shields the pointer so hover styles drop out of the resting measurement. */
   async function measure(el: Element) {
-    const hovered = liveStyles;
+    const hovered = readStyles(el);
+    const hoveredMotion = snapshotMotionStyles(el);
     const scan = options.getScan();
     overlay?.classList.add("shield");
     await frames(2);
@@ -357,6 +356,7 @@ export function createPicker(options: PickerOptions) {
       intent: options.getIntent(),
       job: options.getJob(),
       liveStyles: hovered,
+      liveMotionStyles: hoveredMotion,
       detected: scan?.url === location.href ? scan.detected : undefined,
     });
     if (host) host.style.display = "none";
@@ -424,7 +424,6 @@ export function createPicker(options: PickerOptions) {
     overlay = null;
     toastEl = null;
     current = null;
-    liveStyles = {};
   }
 
   function toggle() {

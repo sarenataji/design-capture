@@ -74,7 +74,11 @@ export function captureElement(
   const job: Job = options.job ?? "rebuild";
   const live = options.liveStyles ?? {};
   const node = captureNode(el, 0, live);
-  const motion = captureMotion(el, options.detected ?? detectStack());
+  const motion = captureMotion(
+    el,
+    options.detected ?? detectStack(),
+    options.liveMotionStyles,
+  );
   return {
     url: location.href,
     title: document.title,

@@ -10,17 +10,97 @@
     <header class="top">
       <div>
         <p class="kicker" id="status">Idle</p>
-        <h1>Design Capture</h1>
+        <h1 id="view-title">Design Capture</h1>
       </div>
+      <button
+        id="library-toggle"
+        class="icon-button"
+        type="button"
+        aria-label="Open saved scans"
+        aria-pressed="false"
+        title="Saved scans"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3.5 6.5h6l2 2h9v10h-17z"></path>
+        </svg>
+      </button>
     </header>
 
-    <div class="actions" aria-label="Capture actions">
+    <div class="actions capture-only" aria-label="Capture actions">
       <button id="pick" type="button">Pick element</button>
       <button id="scan" type="button" class="ghost">Scan page</button>
       <button id="copy" type="button" class="ghost">Copy result</button>
     </div>
 
-    <details id="capture-setup" class="setup">
+    <section id="summary" class="inspector capture-only" hidden aria-labelledby="sum-title">
+      <div class="inspector-heading">
+        <div>
+          <p class="eyebrow">Selected element</p>
+          <h2 id="sum-title">No capture yet</h2>
+        </div>
+        <span class="found-badge">Detected</span>
+      </div>
+      <p id="sum-meta" class="inspector-source"></p>
+
+      <div class="inspector-grid" aria-label="Element geometry">
+        <div class="spec-cell">
+          <span>Size</span>
+          <strong id="sum-size"></strong>
+        </div>
+        <div class="spec-cell">
+          <span>Position</span>
+          <strong id="sum-position"></strong>
+        </div>
+      </div>
+      <div id="sum-layout" class="fact-list layout-facts"></div>
+
+      <section class="inspector-group" aria-labelledby="type-title">
+        <div class="inspector-group-head">
+          <h3 id="type-title">Typography</h3>
+          <span id="sum-font-count" class="section-count"></span>
+        </div>
+        <div id="sum-typography" class="fact-list"></div>
+        <div id="sum-declared-fonts" class="declared-fonts" hidden>
+          <span>Fonts in rotation</span>
+          <div id="sum-font-list" class="tag-list"></div>
+        </div>
+      </section>
+
+      <section class="inspector-group" aria-labelledby="color-title">
+        <div class="inspector-group-head">
+          <h3 id="color-title">Colors</h3>
+          <span id="sum-color-count" class="section-count"></span>
+        </div>
+        <div id="sum-visible-colors" class="color-group"></div>
+        <div id="sum-css-colors" class="color-group"></div>
+      </section>
+
+      <section class="inspector-group motion-group" aria-labelledby="motion-title">
+        <div class="inspector-group-head">
+          <h3 id="motion-title">Motion</h3>
+          <span id="sum-motion-badge" class="motion-badge"></span>
+        </div>
+        <strong id="sum-motion-title" class="motion-title"></strong>
+        <p id="sum-motion-detail" class="motion-detail"></p>
+        <div id="sum-motion-effects" class="fact-list"></div>
+      </section>
+
+      <section id="sum-libraries-section" class="inspector-group" aria-labelledby="libraries-title" hidden>
+        <div class="inspector-group-head">
+          <h3 id="libraries-title">Libraries detected on page</h3>
+          <span class="evidence-label">Page evidence</span>
+        </div>
+        <div id="sum-libraries" class="library-tags"></div>
+        <p class="inspector-note">Detected on the page, but not automatically attributed to this element.</p>
+      </section>
+
+      <section class="inspector-group compact-group" aria-labelledby="states-title">
+        <h3 id="states-title">Interaction states</h3>
+        <div id="sum-states" class="state-list"></div>
+      </section>
+    </section>
+
+    <details id="capture-setup" class="setup capture-only">
       <summary class="setup-head">
         <div>
           <p class="eyebrow">Capture setup</p>
@@ -137,9 +217,9 @@
       </div>
     </details>
 
-    <div id="scrim" class="scrim" hidden></div>
+    <div id="scrim" class="scrim capture-only" hidden></div>
 
-    <details id="scan-report" class="scan" hidden>
+    <details id="scan-report" class="scan capture-only" hidden>
       <summary class="scan-head">
         <div class="field-head">
           <span>Site scan <em>ready</em></span>
@@ -212,48 +292,30 @@
       </div>
     </details>
 
-    <section id="summary" class="summary empty" hidden>
-      <div>
-        <strong id="sum-title">No capture yet</strong>
-        <p id="sum-meta">
-          <span id="sum-meta-text"></span>
-          <button
-            type="button"
-            id="sum-colors"
-            class="count"
-            data-guide="colors-guide"
-            aria-expanded="false"
-            aria-controls="colors-guide"
-            hidden
-          ></button>
-        </p>
-      </div>
-      <button
-        type="button"
-        id="swatches"
-        class="swatches"
-        data-guide="colors-guide"
-        aria-label="Show color codes"
-      ></button>
-
-      <div
-        id="colors-guide"
-        class="guide"
-        role="dialog"
-        aria-label="Colors in this capture"
-        tabindex="-1"
-        hidden
-      >
-        <div class="guide-head">
-          <strong>Colors in this capture</strong>
-          <button type="button" class="guide-x" aria-label="Close">×</button>
+    <section class="library" aria-labelledby="library-title">
+      <div class="library-head">
+        <div>
+          <p class="eyebrow">Library</p>
+          <h2 id="library-title">Saved scans</h2>
         </div>
-        <p class="guide-lede">Tap any color to copy its code.</p>
-        <div id="colors-guide-list" class="guide-list"></div>
+        <button id="new-folder" type="button" class="ghost compact">New folder</button>
       </div>
+      <div id="folder-create" class="folder-create" hidden>
+        <label for="folder-name">Folder name</label>
+        <div>
+          <input id="folder-name" type="text" maxlength="60" placeholder="e.g. Landing pages" />
+          <button id="add-folder" type="button">Create</button>
+          <button id="cancel-folder" type="button" class="ghost">Cancel</button>
+        </div>
+      </div>
+      <div class="library-tools">
+        <select id="scan-folder" aria-label="Saved scans folder"></select>
+        <button id="save-scan" type="button" disabled>Save current scan</button>
+      </div>
+      <div id="saved-scans" class="saved-scans"></div>
     </section>
 
-    <section class="outputs result-panel">
+    <section class="outputs result-panel capture-only">
       <div class="field-head">
         <span>Output</span>
         <button
@@ -289,9 +351,9 @@
       </div>
     </section>
 
-    <pre id="out">Pick reads one element. Scan page reads the whole site. Click to lock what you hover.</pre>
+    <pre id="out" class="capture-only">Pick reads one element. Scan page reads the whole site. Click to lock what you hover.</pre>
 
-    <footer>
+    <footer class="capture-only">
       <span><kbd>⌥⇧D</kbd> picker</span>
       <span><kbd>↑</kbd><kbd>↓</kbd> parent / child</span>
       <span>Scan page = site</span>

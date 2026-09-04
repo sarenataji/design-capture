@@ -76,6 +76,17 @@ export type MotionEffectCapture = {
   iterations: string;
   direction: string;
   fill: string;
+  /** How the trigger was attributed (CSS selector or an observed before/after state). */
+  triggerSource?: string;
+  triggerConfidence?: "high" | "medium" | "low";
+  /** Measured resting and triggered values when both states were observable. */
+  values?: Record<string, { from: string; to: string }>;
+  /** The engine or authoring library attributable to this specific effect. */
+  library?: {
+    name: string;
+    confidence: "high" | "medium" | "low";
+    evidence: string;
+  };
   playState?: string;
   timeline?: string;
   keyframes?: Record<string, string | number | null>[];
@@ -172,12 +183,27 @@ export type PageScan = {
   detected: DetectedLib[];
 };
 
+export type ScanFolder = {
+  id: string;
+  name: string;
+  createdAt: string;
+};
+
+export type SavedScan = {
+  id: string;
+  folderId: string;
+  savedAt: string;
+  scan: PageScan;
+};
+
 export type CaptureOptions = {
   intent?: string;
   target?: Target;
   job?: Job;
   /** Computed styles while the pointer was over the node (may include :hover). */
   liveStyles?: StyleMap;
+  /** Computed styles sampled while the pointer is still over the component. */
+  liveMotionStyles?: Map<Element, StyleMap>;
   /** A same-page scan can contribute stronger library detection (including globals). */
   detected?: DetectedLib[];
 };

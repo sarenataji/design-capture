@@ -10,6 +10,8 @@ import type {
   Job,
   OutputKind,
   PageScan,
+  SavedScan,
+  ScanFolder,
   Target,
 } from "../../lib/types";
 
@@ -31,16 +33,45 @@ const tabs = document.querySelector<HTMLSelectElement>("#tabs")!;
 const status = document.querySelector<HTMLElement>("#status")!;
 const summary = document.querySelector<HTMLElement>("#summary")!;
 const sumTitle = document.querySelector<HTMLElement>("#sum-title")!;
-const sumMeta = document.querySelector<HTMLElement>("#sum-meta-text")!;
-const sumColors = document.querySelector<HTMLButtonElement>("#sum-colors")!;
-const colorsGuideList =
-  document.querySelector<HTMLElement>("#colors-guide-list")!;
-const swatches = document.querySelector<HTMLElement>("#swatches")!;
-const scanReport = document.querySelector<HTMLElement>("#scan-report")!;
+const sumMeta = document.querySelector<HTMLElement>("#sum-meta")!;
+const sumSize = document.querySelector<HTMLElement>("#sum-size")!;
+const sumPosition = document.querySelector<HTMLElement>("#sum-position")!;
+const sumLayout = document.querySelector<HTMLElement>("#sum-layout")!;
+const sumFontCount = document.querySelector<HTMLElement>("#sum-font-count")!;
+const sumTypography = document.querySelector<HTMLElement>("#sum-typography")!;
+const sumDeclaredFonts = document.querySelector<HTMLElement>("#sum-declared-fonts")!;
+const sumFontList = document.querySelector<HTMLElement>("#sum-font-list")!;
+const sumColorCount = document.querySelector<HTMLElement>("#sum-color-count")!;
+const sumVisibleColors = document.querySelector<HTMLElement>("#sum-visible-colors")!;
+const sumCssColors = document.querySelector<HTMLElement>("#sum-css-colors")!;
+const sumMotionBadge = document.querySelector<HTMLElement>("#sum-motion-badge")!;
+const sumMotionTitle = document.querySelector<HTMLElement>("#sum-motion-title")!;
+const sumMotionDetail = document.querySelector<HTMLElement>("#sum-motion-detail")!;
+const sumMotionEffects = document.querySelector<HTMLElement>("#sum-motion-effects")!;
+const sumLibrariesSection = document.querySelector<HTMLElement>("#sum-libraries-section")!;
+const sumLibraries = document.querySelector<HTMLElement>("#sum-libraries")!;
+const sumStates = document.querySelector<HTMLElement>("#sum-states")!;
+const scanReport = document.querySelector<HTMLDetailsElement>("#scan-report")!;
 const scanSource = document.querySelector<HTMLElement>("#scan-source")!;
 const scanRows = document.querySelector<HTMLElement>("#scan-rows")!;
 const captureSetup = document.querySelector<HTMLDetailsElement>("#capture-setup")!;
 const setupSummary = document.querySelector<HTMLElement>("#setup-summary")!;
+const libraryToggle = document.querySelector<HTMLButtonElement>("#library-toggle")!;
+const viewTitle = document.querySelector<HTMLElement>("#view-title")!;
+const newFolder = document.querySelector<HTMLButtonElement>("#new-folder")!;
+const folderCreate = document.querySelector<HTMLElement>("#folder-create")!;
+const folderName = document.querySelector<HTMLInputElement>("#folder-name")!;
+const addFolder = document.querySelector<HTMLButtonElement>("#add-folder")!;
+const cancelFolder = document.querySelector<HTMLButtonElement>("#cancel-folder")!;
+const scanFolder = document.querySelector<HTMLSelectElement>("#scan-folder")!;
+const saveScan = document.querySelector<HTMLButtonElement>("#save-scan")!;
+const savedScans = document.querySelector<HTMLElement>("#saved-scans")!;
+
+const FAVORITES_FOLDER: ScanFolder = {
+  id: "favorites",
+  name: "Favorites",
+  createdAt: "",
+};
 
 let kind: OutputKind = "photocopy";
 let job: Job = "rebuild";
@@ -50,6 +81,19 @@ let picking = false;
 let scanning = false;
 let currentTabId: number | null = null;
 let currentPageUrl = "";
+let scanFolders: ScanFolder[] = [FAVORITES_FOLDER];
+let savedScanItems: SavedScan[] = [];
+let selectedFolderId = FAVORITES_FOLDER.id;
+let showingLibrary = false;
+
+const folderIcon = `
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M3.5 6.5h6l2 2h9v10h-17z"></path>
+  </svg>`;
+const backIcon = `
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M15 5l-7 7 7 7"></path>
+  </svg>`;
 
 target.innerHTML = TARGETS.map(
   (item) => `<option value="${item.id}">${item.label}</option>`,
@@ -120,6 +164,8 @@ async function restore() {
     STORAGE_KEYS.direction,
     STORAGE_KEYS.pickerActive,
     STORAGE_KEYS.outputKind,
+    STORAGE_KEYS.scanFolders,
+    STORAGE_KEYS.savedScans,
     ]),
     readCurrentTab(),
   ]);
@@ -128,6 +174,13 @@ async function restore() {
   if (stored.job) job = stored.job as Job;
   else if (stored.direction) job = stored.direction as Job;
   if (stored.outputKind) kind = stored.outputKind as OutputKind;
+  const storedFolders = Array.isArray(stored.scanFolders)
+    ? stored.scanFolders as ScanFolder[]
+    : [];
+  scanFolders = [FAVORITES_FOLDER, ...storedFolders.filter((folder) => folder.id !== FAVORITES_FOLDER.id)];
+  savedScanItems = Array.isArray(stored.savedScans)
+    ? stored.savedScans as SavedScan[]
+    : [];
   picking = Boolean(stored.pickerActive);
   await restorePageData();
   syncTabs();
@@ -385,7 +438,74 @@ function row(label: string, value: string, empty: string) {
 }
 
 function esc(value: string) {
-  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;");
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function capturedAttributes(html: string) {
+  const element = new DOMParser()
+    .parseFromString(html, "text/html")
+    .body.firstElementChild;
+  const values = new Map<string, string>();
+  for (const attribute of Array.from(element?.attributes ?? [])) {
+    values.set(attribute.name.toLowerCase(), attribute.value.trim());
+  }
+  const first = (...names: string[]) => {
+    for (const name of names) {
+      const value = values.get(name);
+      if (value) return value;
+    }
+    return "";
+  };
+  const fontList = first("fonts", "data-fonts", "font-list", "data-font-list")
+    .split(/[,|]/)
+    .map((font) => font.trim())
+    .filter(Boolean);
+  return {
+    fontList: [...new Set(fontList)],
+    currentFont: first("font", "data-font", "current-font", "data-current-font"),
+    autoplay: ["autoplay", "data-autoplay"].some((name) => values.has(name)),
+    interval: first("autoplay-interval", "data-autoplay-interval", "interval", "data-interval"),
+  };
+}
+
+function fact(label: string, value: string, detail = "") {
+  return `<div class="fact-row">
+    <span>${esc(label)}</span>
+    <div><strong>${esc(value)}</strong>${detail ? `<small>${esc(detail)}</small>` : ""}</div>
+  </div>`;
+}
+
+function isUsefulLayoutValue(value: string | undefined) {
+  return Boolean(value && !["none", "normal", "static", "0px", "0px 0px", "auto"].includes(value));
+}
+
+function colorGroup(
+  label: string,
+  colors: { value: string; role?: string; roles?: string[] }[],
+) {
+  if (!colors.length) return "";
+  return `<p class="color-label">${esc(label)}</p>
+    <div class="inspector-colors">
+      ${colors.slice(0, 12).map((color) => {
+        const roles = color.roles?.join(", ") || color.role || "color";
+        return `<button type="button" class="inspector-color" data-hex="${esc(color.value)}" title="Copy ${esc(color.value)} · ${esc(roles)}">
+          <i style="background:${esc(color.value)}"></i>
+          <code>${esc(color.value)}</code>
+          <small>${esc(roles)}</small>
+        </button>`;
+      }).join("")}
+    </div>`;
+}
+
+function effectName(type: string) {
+  if (type === "css-animation") return "CSS animation";
+  if (type === "web-animation") return "Web Animations API";
+  return "CSS transition";
 }
 
 function sourceHost(url: string): string {
@@ -396,9 +516,60 @@ function sourceHost(url: string): string {
   }
 }
 
+function formatSavedDate(value: string) {
+  return new Date(value).toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+function setLibraryView(show: boolean) {
+  showingLibrary = show;
+  document.body.classList.toggle("library-mode", show);
+  libraryToggle.setAttribute("aria-pressed", String(show));
+  libraryToggle.setAttribute("aria-label", show ? "Back to capture" : "Open saved scans");
+  libraryToggle.title = show ? "Back to capture" : "Saved scans";
+  libraryToggle.innerHTML = show ? backIcon : folderIcon;
+  viewTitle.textContent = show ? "Saved scans" : "Design Capture";
+  if (show) {
+    status.textContent = "Library";
+    status.className = "kicker idle";
+    renderLibrary();
+  } else {
+    render();
+  }
+}
+
+function renderLibrary() {
+  scanFolder.innerHTML = scanFolders
+    .map((folder) => `<option value="${esc(folder.id)}">${esc(folder.name)}</option>`)
+    .join("");
+  if (!scanFolders.some((folder) => folder.id === selectedFolderId)) {
+    selectedFolderId = FAVORITES_FOLDER.id;
+  }
+  scanFolder.value = selectedFolderId;
+  saveScan.disabled = !scan;
+
+  const items = savedScanItems
+    .filter((item) => item.folderId === selectedFolderId)
+    .sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+  savedScans.innerHTML = items.length
+    ? items.map((item) => `
+      <div class="saved-row">
+        <button type="button" class="saved-open" data-saved-id="${esc(item.id)}">
+          <strong>${esc(item.scan.title || sourceHost(item.scan.url))}</strong>
+          <small>${esc(sourceHost(item.scan.url))} · ${formatSavedDate(item.savedAt)}</small>
+        </button>
+        <button type="button" class="saved-remove" data-remove-id="${esc(item.id)}" aria-label="Remove saved scan">×</button>
+      </div>`).join("")
+    : `<p class="saved-empty">No scans in this folder yet.</p>`;
+}
+
 function render() {
+  if (showingLibrary) {
+    renderLibrary();
+    return;
+  }
   setPicking(picking);
   renderScan();
+  renderLibrary();
   if (!capture) {
     summary.hidden = true;
     if (openHelp?.closest("#summary")) setGuide(null);
@@ -410,41 +581,118 @@ function render() {
 
   summary.hidden = false;
   const tokens = capture.tokens;
-  const shownColors = tokens.visualColors?.length
-    ? tokens.visualColors.map((color) => ({
-        value: color.value,
-        roles: ["visible pixel"],
-      }))
-    : tokens.colors;
-  const motionCount = capture.motion.effects?.length ??
-    capture.motion.transitions.length + capture.motion.animations.length;
-  const motionLibraries = (capture.motion.libraries ?? []).map((lib) => lib.name);
-  sumTitle.textContent = `${capture.node.tag} · ${capture.node.box.width}×${capture.node.box.height}`;
-  sumMeta.textContent = [
-    sourceHost(capture.url),
-    tokens.fonts[0]?.family ?? "type",
-    motionCount ? `${motionCount} motion effect${motionCount === 1 ? "" : "s"}` : "no motion measured",
-    motionLibraries.length ? motionLibraries.join(", ") : "",
-  ].filter(Boolean).join(" · ") + " · ";
-  sumColors.hidden = shownColors.length === 0;
-  sumColors.textContent = `${shownColors.length} ${tokens.visualColors?.length ? "visible" : "CSS"} colors`;
-  swatches.innerHTML = shownColors
-    .slice(0, 8)
-    .map(
-      (c) =>
-        `<i title="${c.value} · ${c.roles.join(", ")}" style="background:${c.value}"></i>`,
-    )
+  const attributes = capturedAttributes(capture.html);
+  const effects = capture.motion.effects ?? [];
+  const motionLibraries = capture.motion.libraries ?? [];
+  const hasDeclaredRotation = attributes.fontList.length > 1 && attributes.autoplay;
+
+  sumTitle.textContent = capture.node.tag;
+  sumMeta.innerHTML = `<span>${esc(sourceHost(capture.url))}</span><code title="${esc(capture.selector)}">${esc(capture.selector)}</code>`;
+  sumSize.textContent = `${capture.node.box.width} × ${capture.node.box.height} px`;
+  sumPosition.textContent = `x ${capture.node.box.x} · y ${capture.node.box.y}`;
+
+  const layoutFacts: [string, string | undefined][] = [
+    ["Display", capture.node.styles.display],
+    ["Positioning", capture.node.styles.position],
+    ["Padding", capture.node.styles.padding],
+    ["Gap", capture.node.styles.gap],
+    ["Radius", tokens.radii[0] ?? capture.node.styles["border-radius"]],
+    ["Shadow", tokens.shadows[0]],
+  ];
+  sumLayout.innerHTML = layoutFacts
+    .filter(([, value]) => isUsefulLayoutValue(value))
+    .map(([label, value]) => fact(label, value!))
     .join("");
-  colorsGuideList.innerHTML = shownColors
-    .map(
-      (c) =>
-        `<button type="button" class="guide-row color-row" data-hex="${c.value}">
-          <i style="background:${c.value}"></i>
-          <code>${c.value}</code>
-          <small>${c.roles.join(", ")}</small>
-        </button>`,
-    )
+  sumLayout.hidden = !sumLayout.innerHTML;
+
+  const typography = tokens.fonts.length
+    ? tokens.fonts.map((font, index) => fact(
+        index === 0 ? "Rendered family" : "Additional family",
+        font.family,
+        [
+          font.weights.length ? `weight ${font.weights.join(" / ")}` : "",
+          font.sizes.length ? font.sizes.join(" / ") : "",
+        ].filter(Boolean).join(" · "),
+      )).join("")
+    : fact(
+        "Rendered family",
+        capture.node.styles["font-family"] ?? "Not exposed",
+        [capture.node.styles["font-weight"], capture.node.styles["font-size"]]
+          .filter(Boolean)
+          .join(" · "),
+      );
+  sumTypography.innerHTML = typography + (attributes.currentFont
+    ? fact("Current rotation value", attributes.currentFont)
+    : "");
+  sumFontCount.textContent = attributes.fontList.length
+    ? `${attributes.fontList.length} declared · ${tokens.fonts.length || 1} rendered`
+    : `${tokens.fonts.length || 1} rendered`;
+  sumDeclaredFonts.hidden = attributes.fontList.length === 0;
+  sumFontList.innerHTML = attributes.fontList
+    .map((font) => `<span>${esc(font)}</span>`)
     .join("");
+
+  const visibleColors = (tokens.visualColors ?? []).map((color) => ({
+    value: color.value,
+    role: "visible pixel",
+  }));
+  sumVisibleColors.innerHTML = colorGroup("Visible in the selection", visibleColors);
+  sumVisibleColors.hidden = visibleColors.length === 0;
+  sumCssColors.innerHTML = colorGroup("CSS values", tokens.colors);
+  sumCssColors.hidden = tokens.colors.length === 0;
+  sumColorCount.textContent = [
+    visibleColors.length ? `${visibleColors.length} visible` : "",
+    tokens.colors.length ? `${tokens.colors.length} CSS` : "",
+  ].filter(Boolean).join(" · ") || "None found";
+
+  const interval = attributes.interval
+    ? `${attributes.interval}${/^\d+(?:\.\d+)?$/.test(attributes.interval) ? " seconds" : ""}`
+    : "an unspecified interval";
+  const hasElementMotion = effects.length > 0;
+  sumMotionBadge.classList.toggle("found", hasElementMotion || hasDeclaredRotation);
+  sumMotionBadge.textContent = hasElementMotion || hasDeclaredRotation ? "Found" : "Not measured";
+  if (hasDeclaredRotation && hasElementMotion) {
+    sumMotionTitle.textContent = "Font rotation and measurable motion found";
+    sumMotionDetail.textContent = `This element declares autoplay across ${attributes.fontList.length} fonts every ${interval}. ${effects.length} active effect${effects.length === 1 ? " was" : "s were"} also measurable at selection time.`;
+  } else if (hasDeclaredRotation) {
+    sumMotionTitle.textContent = "Font rotation declared by this element";
+    sumMotionDetail.textContent = `Autoplay cycles through ${attributes.fontList.length} declared fonts every ${interval}. The custom element exposed this behavior in its attributes, although no CSS or Web Animations API effect was measurable at selection time.`;
+  } else if (hasElementMotion) {
+    sumMotionTitle.textContent = `${effects.length} motion effect${effects.length === 1 ? "" : "s"} measured on this element`;
+    sumMotionDetail.textContent = "These effects were active or declared on the selection when it was captured.";
+  } else {
+    sumMotionTitle.textContent = "No motion effect exposed on this element";
+    sumMotionDetail.textContent = "No CSS transition, CSS animation, or active Web Animations API effect was measurable at selection time.";
+  }
+  sumMotionEffects.innerHTML = effects.slice(0, 8).map((effect) => [
+    fact(
+      effectName(effect.type),
+      effect.properties.join(", ") || "Keyframed properties",
+      `${effect.trigger} · ${effect.duration} · ${effect.easing}`,
+    ),
+    effect.library
+      ? fact(
+          "Library / engine",
+          effect.library.name,
+          `${effect.library.confidence} confidence · ${effect.library.evidence}`,
+        )
+      : "",
+  ].join("")).join("");
+  sumMotionEffects.hidden = effects.length === 0;
+
+  sumLibrariesSection.hidden = motionLibraries.length === 0;
+  sumLibraries.innerHTML = motionLibraries.map((library) =>
+    `<span><strong>${esc(library.name)}</strong><small>via ${esc(library.via)}</small></span>`,
+  ).join("");
+
+  const stateFlags = [
+    ["Hover", capture.measured?.hover ?? Object.keys(capture.node.hover).length > 0],
+    ["Focus", capture.measured?.focus ?? Object.keys(capture.node.focus).length > 0],
+    ["Active", capture.measured?.active ?? Object.keys(capture.node.active).length > 0],
+  ] as const;
+  sumStates.innerHTML = stateFlags.map(([label, measured]) =>
+    `<span class="state-chip ${measured ? "found" : ""}">${esc(label)}<small>${measured ? "captured" : "not measured"}</small></span>`,
+  ).join("");
 
   out.textContent = renderOutput(kind, withPrefs(capture), scan);
 }
@@ -528,6 +776,86 @@ copyScan.addEventListener("click", async () => {
   void flash(copyScan);
 });
 
+newFolder.addEventListener("click", () => {
+  folderCreate.hidden = false;
+  folderName.focus();
+});
+
+libraryToggle.addEventListener("click", () => {
+  setLibraryView(!showingLibrary);
+});
+
+cancelFolder.addEventListener("click", () => {
+  folderCreate.hidden = true;
+  folderName.value = "";
+});
+
+async function createFolder() {
+  const name = folderName.value.trim();
+  if (!name) return;
+  const folder: ScanFolder = {
+    id: crypto.randomUUID(),
+    name,
+    createdAt: new Date().toISOString(),
+  };
+  scanFolders.push(folder);
+  selectedFolderId = folder.id;
+  await browser.storage.local.set({ [STORAGE_KEYS.scanFolders]: scanFolders });
+  folderName.value = "";
+  folderCreate.hidden = true;
+  renderLibrary();
+}
+
+addFolder.addEventListener("click", () => void createFolder());
+folderName.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") void createFolder();
+  if (event.key === "Escape") cancelFolder.click();
+});
+
+scanFolder.addEventListener("change", () => {
+  selectedFolderId = scanFolder.value;
+  renderLibrary();
+});
+
+saveScan.addEventListener("click", async () => {
+  if (!scan) return;
+  const duplicate = savedScanItems.find(
+    (item) => item.folderId === selectedFolderId && pageKey(item.scan.url) === pageKey(scan?.url),
+  );
+  if (duplicate) {
+    duplicate.scan = scan;
+    duplicate.savedAt = new Date().toISOString();
+  } else {
+    savedScanItems.push({
+      id: crypto.randomUUID(),
+      folderId: selectedFolderId,
+      savedAt: new Date().toISOString(),
+      scan,
+    });
+  }
+  await browser.storage.local.set({ [STORAGE_KEYS.savedScans]: savedScanItems });
+  renderLibrary();
+  void flash(saveScan, duplicate ? "Updated" : "Saved");
+});
+
+savedScans.addEventListener("click", async (event) => {
+  const element = event.target as HTMLElement;
+  const remove = element.closest<HTMLButtonElement>("[data-remove-id]");
+  if (remove?.dataset.removeId) {
+    savedScanItems = savedScanItems.filter((item) => item.id !== remove.dataset.removeId);
+    await browser.storage.local.set({ [STORAGE_KEYS.savedScans]: savedScanItems });
+    renderLibrary();
+    return;
+  }
+  const open = element.closest<HTMLButtonElement>("[data-saved-id]");
+  const item = savedScanItems.find((candidate) => candidate.id === open?.dataset.savedId);
+  if (!item) return;
+  scan = item.scan;
+  setLibraryView(false);
+  scanReport.open = true;
+  scanReport.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
 scanRows.addEventListener("click", async (event) => {
   const chip = (event.target as HTMLElement).closest<HTMLElement>(".chip");
   const hex = chip?.dataset.hex;
@@ -535,6 +863,15 @@ scanRows.addEventListener("click", async (event) => {
   await navigator.clipboard.writeText(hex);
   chip.classList.add("copied");
   setTimeout(() => chip.classList.remove("copied"), 700);
+});
+
+summary.addEventListener("click", async (event) => {
+  const color = (event.target as HTMLElement).closest<HTMLElement>(".inspector-color");
+  const hex = color?.dataset.hex;
+  if (!hex) return;
+  await navigator.clipboard.writeText(hex);
+  color.classList.add("copied");
+  setTimeout(() => color.classList.remove("copied"), 700);
 });
 
 intent.addEventListener("input", () => {
