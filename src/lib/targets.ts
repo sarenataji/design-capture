@@ -3,7 +3,7 @@ import type { Target } from "./types";
 export const TARGETS: { id: Target; label: string; plain: string }[] = [
   {
     id: "auto",
-    label: "Auto (this repo)",
+    label: "Match my project",
     plain: "Match whatever your project already uses. Best pick if you're unsure.",
   },
   {

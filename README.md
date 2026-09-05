@@ -14,7 +14,7 @@ Scan is a separate action. Turn the picker on for components; hit **Scan page** 
 ## Beats
 
 1. **Inspect** — hover. Tooltip with tag, size, type, color, radius, padding/gap, selector.
-2. **Photocopy** — click. Exact spec for that component, including descendant CSS/WAAPI motion, triggers, timing, easing, properties, keyframes, and detected motion libraries.
+2. **Component spec** — click. Exact spec for that component, including descendant CSS/WAAPI motion, triggers, timing, easing, properties, keyframes, and detected motion libraries.
 3. **Prompt** — photocopy + Job / Intent. Includes the scan if you ran one.
 4. **Scan page** — palette, type, spacing/radius ladder, detected stack.
 
@@ -25,11 +25,11 @@ Scan is a separate action. Turn the picker on for components; hit **Scan page** 
 3. **↑** parent, **↓** child. Not `<body>`, not a single letter unless that’s the point.
 4. Optionally leave the pointer on a real `:hover`, then click.
 5. **Scan page** when you want palette / type / tokens / stack for the site.
-6. Pick **Photocopy** if you want that piece exact.
-7. Pick **Prompt** if it’s going into a project: set Job + Intent first.
+6. Pick **Component spec** if you want that piece exact.
+7. Pick **AI prompt** if it’s going into a project: set Job + Intent first.
 8. Paste. One pattern, not the whole website. Scan feeds Prompt/System without replacing the component.
 
-Job is five buttons (default **Rebuild**). Keep / replace / done-when are canned. Only Job, Intent, and Target change.
+Prompt setup offers five jobs (default **Rebuild**), a target stack, and optional creative direction. It appears when AI prompt is selected. Keep / replace / done-when are canned.
 
 ## Stack (researched 2026)
 
@@ -43,7 +43,7 @@ Job is five buttons (default **Rebuild**). Keep / replace / done-when are canned
 | Tokens | **Walk computed styles** | Component on hover-capture; page ladder on Scan. |
 | Stack | **Scripts, DOM, CSS, class names** | Detected only. No Figma/Photoshop. Isolated world — no page-JS heap. |
 | Persistence | **`chrome.storage.local`** | Last capture, Job, Intent, target, output tab. |
-| Panel | **`chrome.sidePanel`** | Job + Intent stay visible while you pick. Popups close on click. |
+| Panel | **`chrome.sidePanel`** | Job + Intent remain saved while you pick. Popups close on click. |
 
 Not used, on purpose: Plasmo, React, html2canvas, `chrome.debugger`, accounts, uploads.
 
@@ -71,3 +71,12 @@ pnpm build
 ```
 
 Chrome or Brave → `chrome://extensions` → Developer mode → Load unpacked → `.output/chrome-mv3`.
+
+## Panel workflow
+
+- Start with **Pick an element** or **Scan this page**. Copy controls appear once a result is available.
+- A capture shows a local thumbnail of its visible area when screenshot capture is available, an element label, and a compact overview. Expand typography, colors, motion, page libraries, and interaction states for the detailed evidence.
+- The persistent export bar keeps the format and copy action together. All six formats remain available for a component: Component spec (formerly Photocopy), AI prompt, DESIGN.md, SKILL.md, CSS, and Tailwind.
+- **Full output preview** shows exactly what the export bar copies. Component spec remains the full measured recipe; other formats retain their existing scope.
+- A standalone page scan can be previewed, copied, and saved directly to Favorites (or the folder last selected in the library). The folder icon opens saved scans and folder management; removed scans can be restored with **Undo** until another removal or panel reload.
+- **Cancel picking** stops the picker. On the page, Escape releases a locked selection, then cancels; arrow keys select a parent or child.

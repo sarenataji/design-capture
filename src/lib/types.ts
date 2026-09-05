@@ -209,6 +209,8 @@ export type CaptureOptions = {
 };
 
 export type CaptureResult = {
+  /** Local thumbnail of the visible selection; omitted from text exports. */
+  previewDataUrl?: string;
   url: string;
   title: string;
   capturedAt: string;

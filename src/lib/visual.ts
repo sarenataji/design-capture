@@ -16,7 +16,7 @@ function distance(a: { r: number; g: number; b: number }, b: { r: number; g: num
 }
 
 /** Samples the pixels actually visible in the tab, including canvas/WebGL/video. */
-export async function captureVisibleColors(box?: Box, limit = 8): Promise<ScanColor[]> {
+export async function captureVisibleColors(box?: Box, limit = 8, onPreview?: (dataUrl: string) => void): Promise<ScanColor[]> {
   const reply = (await browser.runtime
     .sendMessage({ type: "capture-visible-tab" })
     .catch(() => null)) as ScreenshotReply;
@@ -38,6 +38,17 @@ export async function captureVisibleColors(box?: Box, limit = 8): Promise<ScanCo
   const sy = Math.floor(top * scaleY);
   const sw = Math.max(1, Math.min(image.naturalWidth - sx, Math.ceil((right - left) * scaleX)));
   const sh = Math.max(1, Math.min(image.naturalHeight - sy, Math.ceil((bottom - top) * scaleY)));
+  if (onPreview && right > left && bottom > top) {
+    const preview = document.createElement("canvas");
+    const previewRatio = Math.min(1, 480 / Math.max(sw, sh));
+    preview.width = Math.max(1, Math.round(sw * previewRatio));
+    preview.height = Math.max(1, Math.round(sh * previewRatio));
+    const previewContext = preview.getContext("2d");
+    if (previewContext) {
+      previewContext.drawImage(image, sx, sy, sw, sh, 0, 0, preview.width, preview.height);
+      onPreview(preview.toDataURL("image/webp", 0.8));
+    }
+  }
   const ratio = Math.min(1, 128 / Math.max(sw, sh));
   const width = Math.max(1, Math.round(sw * ratio));
   const height = Math.max(1, Math.round(sh * ratio));

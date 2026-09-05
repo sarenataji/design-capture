@@ -3,13 +3,13 @@ import type { OutputKind } from "./types";
 export const OUTPUTS: { id: OutputKind; label: string; plain: string }[] = [
   {
     id: "photocopy",
-    label: "Photocopy",
+    label: "Component spec",
     plain:
       "An exact recipe of the thing you clicked — every color, size and gap, measured, not guessed.",
   },
   {
     id: "prompt",
-    label: "Prompt",
+    label: "AI prompt",
     plain: "That recipe plus your instructions, ready to paste into an AI chat.",
   },
   {

@@ -65,9 +65,13 @@ export default defineContentScript({
     });
 
     browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-      if (message?.type === "toggle-picker") picker.toggle();
-      if (message?.type === "start-picker") picker.start();
-      if (message?.type === "stop-picker") picker.stop();
+      if (["toggle-picker", "start-picker", "stop-picker", "get-picker-state"].includes(message?.type)) {
+        if (message.type === "toggle-picker") picker.toggle();
+        if (message.type === "start-picker") picker.start();
+        if (message.type === "stop-picker") picker.stop();
+        sendResponse({ picking: picker.isActive() });
+        return false;
+      }
       if (message?.type === "scan-page") {
         void (async () => {
           try {

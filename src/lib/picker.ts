@@ -361,7 +361,7 @@ export function createPicker(options: PickerOptions) {
     });
     if (host) host.style.display = "none";
     await frames(2);
-    result.tokens.visualColors = await captureVisibleColors(result.node.box);
+    result.tokens.visualColors = await captureVisibleColors(result.node.box, 8, (dataUrl) => { result.previewDataUrl = dataUrl; });
     if (host) host.style.display = "";
     overlay?.classList.remove("shield");
     return result;
@@ -408,8 +408,9 @@ export function createPicker(options: PickerOptions) {
   }
 
   function stop() {
-    if (!active && !host) return;
+    // Reconcile persisted state even if this page's picker is already stopped.
     setActive(false);
+    previewSeq += 1;
     locked = false;
     expanded = false;
     document.removeEventListener("mousemove", onMove, true);

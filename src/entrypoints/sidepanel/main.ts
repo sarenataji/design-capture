@@ -85,6 +85,33 @@ let scanFolders: ScanFolder[] = [FAVORITES_FOLDER];
 let savedScanItems: SavedScan[] = [];
 let selectedFolderId = FAVORITES_FOLDER.id;
 let showingLibrary = false;
+let removedScan: SavedScan | null = null;
+const welcome = document.querySelector<HTMLElement>("#welcome")!;
+const exportBar = document.querySelector<HTMLElement>("#export-bar")!;
+const outputPreview = document.querySelector<HTMLDetailsElement>("#output-preview")!;
+const pickerHint = document.querySelector<HTMLElement>("#picker-hint")!;
+const sumPreview = document.querySelector<HTMLImageElement>("#sum-preview")!;
+const saveScanInline = document.querySelector<HTMLButtonElement>("#save-scan-inline")!;
+const undoNotice = document.querySelector<HTMLElement>("#undo-notice")!;
+
+function syncExport() {
+  const ready = Boolean(capture || scan);
+  welcome.hidden = ready || picking;
+  exportBar.hidden = !ready;
+  outputPreview.hidden = !ready;
+  copy.disabled = !ready;
+  tabs.disabled = !capture;
+  tabs.hidden = !capture;
+  const outputHelp = exportBar.querySelector<HTMLButtonElement>("[data-guide]")!;
+  outputHelp.hidden = !capture;
+  if (!capture && openHelp === outputHelp) setGuide(null);
+  captureSetup.hidden = !capture || kind !== "prompt";
+  if (captureSetup.hidden && openHelp?.closest("#capture-setup")) setGuide(null);
+  copy.textContent = !capture && scan ? "Copy scan" : ({
+    photocopy: "Copy spec", prompt: "Copy prompt", "design-md": "Copy DESIGN.md",
+    "skill-md": "Copy SKILL.md", css: "Copy CSS", tailwind: "Copy Tailwind",
+  })[kind];
+}
 
 const folderIcon = `
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -155,6 +182,20 @@ async function restorePageData() {
   scan = storedScan && belongsToCurrentPage(storedScan) ? storedScan : null;
 }
 
+function isPickerState(value: unknown): value is { picking: boolean } {
+  return typeof value === "object" && value !== null && "picking" in value && typeof value.picking === "boolean";
+}
+
+async function readPickerState() {
+  const tabId = currentTabId;
+  const url = currentPageUrl;
+  const result = tabId === null ? null : await browser.tabs
+    .sendMessage(tabId, { type: "get-picker-state" }).catch(() => null);
+  if (currentTabId === tabId && currentPageUrl === url) {
+    picking = isPickerState(result) ? result.picking : false;
+  }
+}
+
 async function restore() {
   const [stored] = await Promise.all([
     browser.storage.local.get([
@@ -181,7 +222,7 @@ async function restore() {
   savedScanItems = Array.isArray(stored.savedScans)
     ? stored.savedScans as SavedScan[]
     : [];
-  picking = Boolean(stored.pickerActive);
+  await readPickerState();
   await restorePageData();
   syncTabs();
   syncJobs();
@@ -202,6 +243,7 @@ async function switchPage(tabId?: number, url?: string) {
   scanning = false;
   setGuide(null);
   await restorePageData();
+  await readPickerState();
   render();
 }
 
@@ -282,7 +324,7 @@ function setGuide(next: HTMLButtonElement | null) {
   const list = guide.querySelector<HTMLElement>(".guide-list")!;
   guide.hidden = false;
   guide.classList.remove("up");
-  list.style.maxHeight = "";
+  if (list) list.style.maxHeight = "";
   next.classList.add("on");
   next.setAttribute("aria-expanded", "true");
 
@@ -291,9 +333,7 @@ function setGuide(next: HTMLButtonElement | null) {
   const above = anchor.top - 20;
   const up = guide.offsetHeight > below && above > below;
   guide.classList.toggle("up", up);
-  list.style.maxHeight = `${
-    (up ? above : below) - (guide.offsetHeight - list.offsetHeight)
-  }px`;
+  if (list) list.style.maxHeight = `${Math.max(80, (up ? above : below) - (guide.offsetHeight - list.offsetHeight))}px`;
 
   const trigger = next.getBoundingClientRect();
   guide.style.setProperty(
@@ -301,15 +341,17 @@ function setGuide(next: HTMLButtonElement | null) {
     `${trigger.left + trigger.width / 2 - guide.getBoundingClientRect().left - 4}px`,
   );
 
-  (list.querySelector<HTMLButtonElement>("button") ?? guide).focus();
+  (list?.querySelector<HTMLButtonElement>("button") ?? guide).focus();
 }
 
 function setPicking(on: boolean) {
   picking = on;
   pick.classList.toggle("on", on);
-  pick.textContent = on ? "Listening…" : "Pick element";
+  pick.textContent = on ? "Cancel picking" : capture ? "Pick another" : "Pick an element";
+  pick.setAttribute("aria-pressed", String(on));
+  pickerHint.hidden = !on;
   scanBtn.disabled = scanning;
-  scanBtn.textContent = scanning ? "Scanning" : "Scan page";
+  scanBtn.textContent = scanning ? "Scanning…" : "Scan this page";
   status.textContent = scanning
     ? "Scanning page"
     : on
@@ -318,7 +360,7 @@ function setPicking(on: boolean) {
         ? "Captured"
         : scan
           ? "Scanned"
-          : "Idle";
+          : "Ready";
   status.className = `kicker ${on || scanning ? "live" : "idle"}`;
 }
 
@@ -338,6 +380,8 @@ function renderScan() {
     return;
   }
   scanReport.hidden = false;
+  document.querySelector<HTMLElement>("#scan-overview")!.textContent =
+    `${scan.colors.length} CSS colors · ${scan.fonts.length} fonts · ${scan.spacing.length} spacing values`;
 
   const host = sourceHost(scan.url);
   const counted = typeof scan.elements === "number"
@@ -383,7 +427,6 @@ function renderScan() {
     )
     .join("<br>");
   const vars = scan.cssVariables
-    .slice(0, 6)
     .map((v) => esc(`${v.name}: ${v.value}`))
     .join("<br>");
 
@@ -491,7 +534,7 @@ function colorGroup(
   if (!colors.length) return "";
   return `<p class="color-label">${esc(label)}</p>
     <div class="inspector-colors">
-      ${colors.slice(0, 12).map((color) => {
+      ${colors.map((color) => {
         const roles = color.roles?.join(", ") || color.role || "color";
         return `<button type="button" class="inspector-color" data-hex="${esc(color.value)}" title="Copy ${esc(color.value)} · ${esc(roles)}">
           <i style="background:${esc(color.value)}"></i>
@@ -546,6 +589,8 @@ function renderLibrary() {
   }
   scanFolder.value = selectedFolderId;
   saveScan.disabled = !scan;
+  saveScanInline.disabled = !scan;
+  saveScanInline.textContent = `Save to ${scanFolders.find(folder => folder.id === selectedFolderId)?.name ?? "Favorites"}`;
 
   const items = savedScanItems
     .filter((item) => item.folderId === selectedFolderId)
@@ -568,14 +613,13 @@ function render() {
     return;
   }
   setPicking(picking);
+  syncExport();
   renderScan();
   renderLibrary();
   if (!capture) {
     summary.hidden = true;
     if (openHelp?.closest("#summary")) setGuide(null);
-    out.textContent = scan
-      ? "Scan is the wide shot. Pick a component, click to lock it, and its spec lands here."
-      : "Pick reads one element. Scan page reads the whole site. Click locks what you hover.";
+    out.textContent = scan ? toScanMd(scan) : "";
     return;
   }
 
@@ -586,7 +630,21 @@ function render() {
   const motionLibraries = capture.motion.libraries ?? [];
   const hasDeclaredRotation = attributes.fontList.length > 1 && attributes.autoplay;
 
-  sumTitle.textContent = capture.node.tag;
+  const nodeLabel = capture.node.role || capture.node.tag;
+  const nodeText = capture.node.text?.trim().replace(/\s+/g, " ");
+  sumTitle.textContent = nodeText ? `${nodeLabel} · “${nodeText.slice(0, 70)}${nodeText.length > 70 ? "…" : ""}”` : nodeLabel;
+  sumTitle.title = nodeText || nodeLabel;
+  sumPreview.hidden = !capture.previewDataUrl;
+  if (capture.previewDataUrl) sumPreview.src = capture.previewDataUrl;
+  else sumPreview.removeAttribute("src");
+  document.querySelector<HTMLElement>("#sum-overview")!.textContent = [
+    tokens.fonts[0]?.family || capture.node.styles["font-family"],
+    capture.node.styles["font-size"],
+    capture.node.styles.padding ? `Padding ${capture.node.styles.padding}` : "",
+  ].filter(Boolean).join(" · ");
+  document.querySelector<HTMLElement>("#sum-swatches")!.innerHTML = tokens.colors.slice(0, 6).map(color =>
+    `<button type="button" class="inspector-color overview-color" data-hex="${esc(color.value)}" title="Copy ${esc(color.value)}" aria-label="Copy ${esc(color.value)}"><i style="background:${esc(color.value)}"></i></button>`
+  ).join("");
   sumMeta.innerHTML = `<span>${esc(sourceHost(capture.url))}</span><code title="${esc(capture.selector)}">${esc(capture.selector)}</code>`;
   sumSize.textContent = `${capture.node.box.width} × ${capture.node.box.height} px`;
   sumPosition.textContent = `x ${capture.node.box.x} · y ${capture.node.box.y}`;
@@ -650,7 +708,7 @@ function render() {
     : "an unspecified interval";
   const hasElementMotion = effects.length > 0;
   sumMotionBadge.classList.toggle("found", hasElementMotion || hasDeclaredRotation);
-  sumMotionBadge.textContent = hasElementMotion || hasDeclaredRotation ? "Found" : "Not measured";
+  sumMotionBadge.textContent = hasElementMotion ? `${effects.length} effects` : hasDeclaredRotation ? "Declared" : "Not measured";
   if (hasDeclaredRotation && hasElementMotion) {
     sumMotionTitle.textContent = "Font rotation and measurable motion found";
     sumMotionDetail.textContent = `This element declares autoplay across ${attributes.fontList.length} fonts every ${interval}. ${effects.length} active effect${effects.length === 1 ? " was" : "s were"} also measurable at selection time.`;
@@ -664,7 +722,7 @@ function render() {
     sumMotionTitle.textContent = "No motion effect exposed on this element";
     sumMotionDetail.textContent = "No CSS transition, CSS animation, or active Web Animations API effect was measurable at selection time.";
   }
-  sumMotionEffects.innerHTML = effects.slice(0, 8).map((effect) => [
+  sumMotionEffects.innerHTML = effects.map((effect) => [
     fact(
       effectName(effect.type),
       effect.properties.join(", ") || "Keyframed properties",
@@ -690,6 +748,7 @@ function render() {
     ["Focus", capture.measured?.focus ?? Object.keys(capture.node.focus).length > 0],
     ["Active", capture.measured?.active ?? Object.keys(capture.node.active).length > 0],
   ] as const;
+  document.querySelector<HTMLElement>("#sum-states-count")!.textContent = `${stateFlags.filter(([, measured]) => measured).length} of 3 captured`;
   sumStates.innerHTML = stateFlags.map(([label, measured]) =>
     `<span class="state-chip ${measured ? "found" : ""}">${esc(label)}<small>${measured ? "captured" : "not measured"}</small></span>`,
   ).join("");
@@ -701,14 +760,14 @@ async function sendToTab(type: string) {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return null;
   try {
-    return (await browser.tabs.sendMessage(tab.id, { type })) ?? true;
+    return (await browser.tabs.sendMessage(tab.id, { type })) ?? null;
   } catch {
     try {
       await browser.scripting.executeScript({
         target: { tabId: tab.id },
         files: ["/content-scripts/content.js"],
       });
-      return (await browser.tabs.sendMessage(tab.id, { type })) ?? true;
+      return (await browser.tabs.sendMessage(tab.id, { type })) ?? null;
     } catch {
       return null;
     }
@@ -716,26 +775,40 @@ async function sendToTab(type: string) {
 }
 
 /** Content scripts never load on browser-owned pages, and never in tabs opened before install. */
-async function scanFailure() {
+async function scanFailure(action = "try again") {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   const url = tab?.url ?? "";
   const blocked = /^(chrome|brave|edge|about|devtools|view-source|chrome-extension|moz-extension):/.test(url);
   if (!url || blocked) return "Browser page — open a website first";
   if (/^file:/.test(url)) return "Local file — allow file access in extension settings";
   if (/\.pdf($|\?)/i.test(url)) return "PDF viewer — extensions can't read it";
-  return "Refresh the page, then scan";
+  return `Refresh the page, then ${action}`;
 }
 
 async function flash(button: HTMLButtonElement, label = "Copied") {
   const prev = button.textContent;
   button.textContent = label;
   setTimeout(() => {
-    button.textContent = prev;
+    if (button.textContent === label) {
+      if (button === copy) syncExport();
+      else button.textContent = prev;
+    }
   }, 900);
 }
 
-pick.addEventListener("click", () => {
-  void sendToTab("toggle-picker");
+pick.addEventListener("click", async () => {
+  pick.disabled = true;
+  try {
+    const result = await sendToTab(picking ? "stop-picker" : "start-picker");
+    if (isPickerState(result)) {
+      picking = result.picking;
+      render();
+    } else {
+      status.textContent = await scanFailure("use the picker");
+    }
+  } finally {
+    pick.disabled = false;
+  }
 });
 
 scanBtn.addEventListener("click", async () => {
@@ -751,30 +824,36 @@ scanBtn.addEventListener("click", async () => {
   }
   if (typeof result === "object" && "error" in result) {
     render();
-    status.textContent = "Scan crashed — check the page console";
+    status.textContent = "Could not scan this page. Refresh it and try again.";
     console.error("[design-capture] scan failed:", (result as { error: string }).error);
     return;
   }
   if (typeof result === "object") scan = result as PageScan;
+  scanReport.open = true;
   render();
 });
 
+async function copyText(button: HTMLButtonElement, text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    void flash(button);
+    status.textContent = "Copied to clipboard";
+  } catch {
+    status.textContent = "Could not copy. Select the text in Full output preview and copy it manually.";
+    outputPreview.open = true;
+  }
+}
+
 copy.addEventListener("click", async () => {
-  const text =
-    capture
-      ? (out.textContent ?? "")
-      : scan
-        ? toScanMd(scan)
-        : (out.textContent ?? "");
-  await navigator.clipboard.writeText(text);
-  void flash(copy);
+  if (!capture && !scan) return;
+  await copyText(copy, out.textContent ?? "");
 });
 
 copyScan.addEventListener("click", async () => {
-  if (!scan) return;
-  await navigator.clipboard.writeText(toScanMd(scan));
-  void flash(copyScan);
+  if (scan) await copyText(copyScan, toScanMd(scan));
 });
+
+saveScanInline.addEventListener("click", () => void saveCurrentScan(saveScanInline));
 
 newFolder.addEventListener("click", () => {
   folderCreate.hidden = false;
@@ -817,7 +896,7 @@ scanFolder.addEventListener("change", () => {
   renderLibrary();
 });
 
-saveScan.addEventListener("click", async () => {
+async function saveCurrentScan(button: HTMLButtonElement) {
   if (!scan) return;
   const duplicate = savedScanItems.find(
     (item) => item.folderId === selectedFolderId && pageKey(item.scan.url) === pageKey(scan?.url),
@@ -835,13 +914,18 @@ saveScan.addEventListener("click", async () => {
   }
   await browser.storage.local.set({ [STORAGE_KEYS.savedScans]: savedScanItems });
   renderLibrary();
-  void flash(saveScan, duplicate ? "Updated" : "Saved");
-});
+  void flash(button, duplicate ? "Updated" : "Saved");
+  status.textContent = `Scan ${duplicate ? "updated" : "saved"} in ${scanFolders.find(folder => folder.id === selectedFolderId)?.name ?? "Favorites"}`;
+}
+
+saveScan.addEventListener("click", () => void saveCurrentScan(saveScan));
 
 savedScans.addEventListener("click", async (event) => {
   const element = event.target as HTMLElement;
   const remove = element.closest<HTMLButtonElement>("[data-remove-id]");
   if (remove?.dataset.removeId) {
+    removedScan = savedScanItems.find((item) => item.id === remove.dataset.removeId) ?? null;
+    undoNotice.hidden = !removedScan;
     savedScanItems = savedScanItems.filter((item) => item.id !== remove.dataset.removeId);
     await browser.storage.local.set({ [STORAGE_KEYS.savedScans]: savedScanItems });
     renderLibrary();
@@ -851,9 +935,20 @@ savedScans.addEventListener("click", async (event) => {
   const item = savedScanItems.find((candidate) => candidate.id === open?.dataset.savedId);
   if (!item) return;
   scan = item.scan;
+  if (capture && pageKey(capture.url) !== pageKey(scan.url)) capture = null;
   setLibraryView(false);
   scanReport.open = true;
   scanReport.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+document.querySelector<HTMLButtonElement>("#undo-remove")!.addEventListener("click", async () => {
+  if (!removedScan) return;
+  savedScanItems.push(removedScan);
+  selectedFolderId = removedScan.folderId;
+  removedScan = null;
+  undoNotice.hidden = true;
+  await browser.storage.local.set({ [STORAGE_KEYS.savedScans]: savedScanItems });
+  renderLibrary();
 });
 
 scanRows.addEventListener("click", async (event) => {
@@ -888,7 +983,24 @@ jobs.addEventListener("change", () => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && openHelp) setGuide(null);
+  if (!openHelp) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    setGuide(null);
+  }
+  if (event.key === "Tab" && openHelp) {
+    const guide = guideFor(openHelp);
+    const controls = [...guide.querySelectorAll<HTMLElement>("button, select, textarea, input, [tabindex='0']")];
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === guide)) {
+      event.preventDefault();
+      last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first?.focus();
+    }
+  }
 });
 
 document.addEventListener("click", (event) => {
@@ -934,7 +1046,10 @@ browser.storage.onChanged.addListener((changes, area) => {
     const next = changes.lastScan.newValue as PageScan | undefined;
     if (next && belongsToCurrentPage(next)) scan = next;
   }
-  if (changes.pickerActive) picking = Boolean(changes.pickerActive.newValue);
+  if (changes.pickerActive) {
+    // Storage is shared by tabs; query the current page instead of trusting it.
+    void readPickerState().then(() => render());
+  }
   render();
 });
 

@@ -579,6 +579,6 @@ export function outputLabel(kind: OutputKind): string {
     case "tailwind":
       return "Tailwind";
     default:
-      return "Photocopy";
+      return "Component spec";
   }
 }

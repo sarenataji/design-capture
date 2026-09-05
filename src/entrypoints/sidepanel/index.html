@@ -9,7 +9,7 @@
   <body>
     <header class="top">
       <div>
-        <p class="kicker" id="status">Idle</p>
+        <p class="kicker" id="status" role="status" aria-live="polite">Ready</p>
         <h1 id="view-title">Design Capture</h1>
       </div>
       <button
@@ -26,11 +26,18 @@
       </button>
     </header>
 
+    <section id="welcome" class="welcome capture-only">
+      <h2>Capture a design from this page</h2>
+      <p>Pick a button, card, or section for its exact specs. Scan this page for its colors, fonts, and spacing.</p>
+      <small>Local to your browser. Nothing uploaded.</small>
+    </section>
     <div class="actions capture-only" aria-label="Capture actions">
-      <button id="pick" type="button">Pick element</button>
-      <button id="scan" type="button" class="ghost">Scan page</button>
-      <button id="copy" type="button" class="ghost">Copy result</button>
+      <button id="pick" type="button">Pick an element</button>
+      <button id="scan" type="button" class="ghost">Scan this page</button>
+
     </div>
+
+    <p id="picker-hint" class="picker-hint capture-only" hidden>Hover to inspect · Click to capture · Esc to release / cancel</p>
 
     <section id="summary" class="inspector capture-only" hidden aria-labelledby="sum-title">
       <div class="inspector-heading">
@@ -40,6 +47,9 @@
         </div>
         <span class="found-badge">Detected</span>
       </div>
+      <img id="sum-preview" class="capture-preview" alt="Captured element, visible area" hidden />
+      <p id="sum-overview" class="capture-overview"></p>
+      <div id="sum-swatches" class="overview-swatches"></div>
       <p id="sum-meta" class="inspector-source"></p>
 
       <div class="inspector-grid" aria-label="Element geometry">
@@ -54,60 +64,60 @@
       </div>
       <div id="sum-layout" class="fact-list layout-facts"></div>
 
-      <section class="inspector-group" aria-labelledby="type-title">
-        <div class="inspector-group-head">
+      <details class="inspector-group" aria-labelledby="type-title">
+        <summary class="inspector-group-head">
           <h3 id="type-title">Typography</h3>
           <span id="sum-font-count" class="section-count"></span>
-        </div>
+        </summary>
         <div id="sum-typography" class="fact-list"></div>
         <div id="sum-declared-fonts" class="declared-fonts" hidden>
           <span>Fonts in rotation</span>
           <div id="sum-font-list" class="tag-list"></div>
         </div>
-      </section>
+      </details>
 
-      <section class="inspector-group" aria-labelledby="color-title">
-        <div class="inspector-group-head">
+      <details class="inspector-group" aria-labelledby="color-title">
+        <summary class="inspector-group-head">
           <h3 id="color-title">Colors</h3>
           <span id="sum-color-count" class="section-count"></span>
-        </div>
+        </summary>
         <div id="sum-visible-colors" class="color-group"></div>
         <div id="sum-css-colors" class="color-group"></div>
-      </section>
+      </details>
 
-      <section class="inspector-group motion-group" aria-labelledby="motion-title">
-        <div class="inspector-group-head">
+      <details class="inspector-group motion-group" aria-labelledby="motion-title">
+        <summary class="inspector-group-head">
           <h3 id="motion-title">Motion</h3>
           <span id="sum-motion-badge" class="motion-badge"></span>
-        </div>
+        </summary>
         <strong id="sum-motion-title" class="motion-title"></strong>
         <p id="sum-motion-detail" class="motion-detail"></p>
         <div id="sum-motion-effects" class="fact-list"></div>
-      </section>
+      </details>
 
-      <section id="sum-libraries-section" class="inspector-group" aria-labelledby="libraries-title" hidden>
-        <div class="inspector-group-head">
+      <details id="sum-libraries-section" class="inspector-group" aria-labelledby="libraries-title" hidden>
+        <summary class="inspector-group-head">
           <h3 id="libraries-title">Libraries detected on page</h3>
           <span class="evidence-label">Page evidence</span>
-        </div>
+        </summary>
         <div id="sum-libraries" class="library-tags"></div>
         <p class="inspector-note">Detected on the page, but not automatically attributed to this element.</p>
-      </section>
+      </details>
 
-      <section class="inspector-group compact-group" aria-labelledby="states-title">
-        <h3 id="states-title">Interaction states</h3>
+      <details class="inspector-group compact-group" aria-labelledby="states-title">
+        <summary class="inspector-group-head"><h3 id="states-title">Interaction states</h3><span id="sum-states-count" class="section-count"></span></summary>
         <div id="sum-states" class="state-list"></div>
-      </section>
+      </details>
     </section>
 
-    <details id="capture-setup" class="setup capture-only">
+    <details id="capture-setup" class="setup capture-only" hidden>
       <summary class="setup-head">
         <div>
-          <p class="eyebrow">Capture setup</p>
+          <p class="eyebrow">Prompt setup</p>
           <h2>What should we make?</h2>
         </div>
         <div class="setup-status">
-          <span id="setup-summary">Rebuild · Auto (this repo)</span>
+          <span id="setup-summary">Rebuild · Match my project</span>
           <span class="setup-chevron" aria-hidden="true"></span>
         </div>
       </summary>
@@ -117,7 +127,7 @@
       <div class="control-grid">
       <div class="jobs">
       <div class="field-head">
-        <span>Job</span>
+        <span>What do you want to do?</span>
         <button
           type="button"
           class="help"
@@ -130,9 +140,9 @@
         </button>
       </div>
 
-      <select id="jobs" aria-label="Job"></select>
+      <select id="jobs" aria-label="What do you want to do?"></select>
 
-      <div id="job-guide" class="guide" role="dialog" aria-label="Jobs explained" hidden>
+      <div id="job-guide" class="guide" role="dialog" aria-modal="true" aria-label="Jobs explained" hidden>
         <div class="guide-head">
           <strong>What is a job?</strong>
           <button type="button" class="guide-x" aria-label="Close">×</button>
@@ -164,7 +174,7 @@
       <div
         id="target-guide"
         class="guide"
-        role="dialog"
+        role="dialog" aria-modal="true"
         aria-label="Target stack explained"
         hidden
       >
@@ -200,7 +210,7 @@
       <div
         id="intent-guide"
         class="guide"
-        role="dialog"
+        role="dialog" aria-modal="true"
         aria-label="Creative direction explained"
         tabindex="-1"
         hidden
@@ -222,7 +232,7 @@
     <details id="scan-report" class="scan capture-only" hidden>
       <summary class="scan-head">
         <div class="field-head">
-          <span>Site scan <em>ready</em></span>
+          <span>Page scan <em>ready</em></span>
           <button
             type="button"
             class="help"
@@ -236,10 +246,12 @@
         </div>
         <span class="disclosure">View details</span>
       </summary>
+      <p id="scan-overview" class="scan-overview"></p>
       <div class="scan-body">
         <div class="scan-tools">
           <p id="scan-source" class="scan-source"></p>
-          <button type="button" id="copy-scan" class="ghost">Copy scan</button>
+          <div class="scan-buttons"><button type="button" id="copy-scan" class="ghost">Copy scan</button>
+          <button type="button" id="save-scan-inline" class="ghost">Save scan</button></div>
         </div>
         <div id="scan-rows" class="scan-rows"></div>
       </div>
@@ -247,7 +259,7 @@
       <div
         id="scan-guide"
         class="guide"
-        role="dialog"
+        role="dialog" aria-modal="true"
         aria-label="Scan results explained"
         tabindex="-1"
         hidden
@@ -257,8 +269,8 @@
           <button type="button" class="guide-x" aria-label="Close">×</button>
         </div>
         <p class="guide-lede">
-          Every visible element on screen was read, then the values that repeat
-          were kept. One-offs are dropped, so what's left is the real system.
+          The scan reads visible elements on this page and collects recurring design values.
+          It describes the current page, not every page on the website.
         </p>
         <div class="guide-list">
           <div class="guide-row">
@@ -313,9 +325,10 @@
         <button id="save-scan" type="button" disabled>Save current scan</button>
       </div>
       <div id="saved-scans" class="saved-scans"></div>
+      <div id="undo-notice" class="undo-notice" hidden><span role="status">Scan removed.</span><button id="undo-remove" type="button" class="ghost">Undo</button></div>
     </section>
 
-    <section class="outputs result-panel capture-only">
+    <section id="export-bar" class="outputs result-panel capture-only" hidden aria-label="Export result">
       <div class="field-head">
         <span>Output</span>
         <button
@@ -331,11 +344,12 @@
       </div>
 
       <select id="tabs" aria-label="Output format"></select>
+      <button id="copy" type="button" disabled>Copy spec</button>
 
       <div
         id="output-guide"
         class="guide"
-        role="dialog"
+        role="dialog" aria-modal="true"
         aria-label="Output formats explained"
         hidden
       >
@@ -344,19 +358,22 @@
           <button type="button" class="guide-x" aria-label="Close">×</button>
         </div>
         <p class="guide-lede">
-          The same capture, written out in different ways.
+          The same capture, written out in different ways. Component spec contains the full measured recipe.
         </p>
         <div id="output-guide-list" class="guide-list"></div>
         <p class="guide-foot">Tap one to use it. You can change it any time.</p>
       </div>
     </section>
 
-    <pre id="out" class="capture-only">Pick reads one element. Scan page reads the whole site. Click to lock what you hover.</pre>
+    <details id="output-preview" class="output-preview capture-only" hidden>
+      <summary>Full output preview <span>Review the exact text that will be copied</span></summary>
+      <pre id="out"></pre>
+    </details>
 
     <footer class="capture-only">
       <span><kbd>⌥⇧D</kbd> picker</span>
       <span><kbd>↑</kbd><kbd>↓</kbd> parent / child</span>
-      <span>Scan page = site</span>
+      <span>Esc release / cancel</span>
     </footer>
 
     <script type="module" src="./main.ts"></script>
